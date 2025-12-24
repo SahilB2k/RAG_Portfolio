@@ -66,6 +66,9 @@ resume_rag/
 ├── data/
 │   └── resume.md           # Source data in Markdown
 └── requirements.txt        # Project dependencies
+└── .env       
+
+
 
 ```
 
