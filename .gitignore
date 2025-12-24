@@ -7,7 +7,7 @@ __pycache__/
 data/
 package-lock.json
 package.json
-assets/
+
 logs/
 *.log 
 .data/
