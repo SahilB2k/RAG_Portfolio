@@ -14,8 +14,8 @@ This project is a high-performance **RAG (Retrieval-Augmented Generation)** appl
 
 ### 🎥 Live Demo (UI)
 
-> **Insert a screenshot of your Streamlit UI here**
-> `![Application UI](C:\Users\sahil jadhav\OneDrive\Documents\resume_rag\assets\UI.png)`
+<!-- > **Insert a screenshot of your Streamlit UI here**
+> `![Application UI](C:\Users\sahil jadhav\OneDrive\Documents\resume_rag\assets\UI.png)` -->
 
 ---
 
