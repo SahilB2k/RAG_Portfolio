@@ -1,6 +1,4 @@
-To make your GitHub repository look professional for recruiters, your `README.md` should focus on the **problem** you solved and the **architecture** you built.
 
-Here is the complete, formal `README.md` content. I have included placeholders for where you should insert your UI screenshots.
 
 ---
 
@@ -144,8 +142,4 @@ streamlit run app/streamlit_app.py
 
 
 
-### How to add the UI Images:
 
-1. **Take Screenshots:** Open your Streamlit app and take a screenshot of the main chat window and one where it shows the "Retrieval Debug" output (to show your engineering work).
-2. **Save them:** Create an `assets/` folder in your project and save the images there (e.g., `assets/ui_main.png`).
-3. **Update README:** Use the Markdown syntax: `![Alt Text](assets/ui_main.png)`.
