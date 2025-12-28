@@ -119,7 +119,8 @@ Answer (use **bold** for key terms, keep under 150 words):"""
         yield {"answer_chunk": "Request timed out. Please try asking a more specific question.", "metadata": None}
     except Exception as e:
         print(f"❌ [RAG] Error: {e}")
-        yield {"answer_chunk": f"An error occurred while generating the answer. Please try again.", "metadata": None}
+        error_msg = f"Error: {str(e)}"
+        yield {"answer_chunk": f"Ouch! My digital brain hit a snag: {error_msg}. Please check if the Ollama tunnel is alive! 🧠💤", "metadata": None}
 
 
 def generate_answer(question: str) -> str:
