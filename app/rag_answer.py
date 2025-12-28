@@ -83,6 +83,10 @@ Answer (use **bold** for key terms, keep under 150 words):"""
                     "repeat_penalty": 1.1
                 }
             },
+            headers={
+                "Content-Type": "application/json",
+                "ngrok-skip-browser-warning": "any"
+            },
             stream=True,
             timeout=120
         )
