@@ -3,7 +3,7 @@ import axios from 'axios';
 // IMPORTANT: Replace this with your computer's local IP address (e.g., 192.168.1.X)
 // so that a physical mobile device can connect to the local backend.
 // if you are using an Android emulator, 10.0.2.2 usually works.
-const BASE_URL = 'https://616d8b37c2e8.ngrok-free.app';
+const BASE_URL = 'https://da75efb76fdb.ngrok-free.app';
 
 export function askStreamingQuestion(
   question: string,
