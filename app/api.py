@@ -23,7 +23,11 @@ def ask():
         return jsonify({"error": "Question is required"}), 400
 
     def generate():
-        for chunk in generate_answer_with_sources(question):
+        user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ',' in user_ip: user_ip = user_ip.split(',')[0].strip()
+        print(f"🌍 [API] Request from IP: {user_ip}")
+        
+        for chunk in generate_answer_with_sources(question, user_ip=user_ip):
             yield json.dumps(chunk) + "\n"
 
     return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
@@ -40,7 +44,10 @@ def ask_sync():
     full_answer = ""
     metadata = None
     
-    for chunk in generate_answer_with_sources(question):
+    user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if ',' in user_ip: user_ip = user_ip.split(',')[0].strip()
+    
+    for chunk in generate_answer_with_sources(question, user_ip=user_ip):
         if chunk.get("answer_chunk"):
             full_answer += chunk["answer_chunk"]
         if chunk.get("metadata"):

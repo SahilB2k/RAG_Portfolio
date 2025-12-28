@@ -10,6 +10,23 @@ import os
 import time
 from app.query_resume import hybrid_search
 from app.config import Config
+from app.db import get_connection
+
+def log_query(question: str, provider: str, confidence: str, user_ip: str = "unknown"):
+    """Saves the user query metadata to Supabase for observability"""
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO query_logs (question, provider, confidence, user_ip) VALUES (%s, %s, %s, %s)",
+            (question, provider, confidence, user_ip)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"📝 [Log] Query recorded in Supabase (Provider: {provider})")
+    except Exception as e:
+        print(f"⚠️ [Log] Failed to log query: {e}")
 
 def generate_with_groq(prompt):
     """Primary provider: Groq (Llama 3.2 70B or 3B)"""
@@ -96,7 +113,7 @@ def generate_with_ollama(prompt):
             if chunk.get("done"):
                 break
 
-def generate_answer_with_sources(question: str):
+def generate_answer_with_sources(question: str, user_ip: str = "unknown"):
     """
     RAG generator with multi-provider fallback strategy: Groq -> Gemini -> Ollama
     """
@@ -144,6 +161,8 @@ Answer (use **bold** for key terms, keep under 150 words):"""
             for text_chunk in func(prompt):
                 yield {"answer_chunk": text_chunk, "metadata": None}
             success = True
+            # Log the successful query
+            log_query(question, name, confidence, user_ip)
             break
         except Exception as e:
             print(f"⚠️ [RAG] {name} failed: {e}")

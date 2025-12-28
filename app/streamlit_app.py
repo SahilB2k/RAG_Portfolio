@@ -357,7 +357,9 @@ if question:
             # 2. Consume the stream
             try:
                 # This is the generator from rag_answer.py
-                stream_gen = generate_answer_with_sources(question)
+                # Note: Streamlit doesn't easily expose client IP without custom components,
+                # so we log as 'streamlit-frontend' for now.
+                stream_gen = generate_answer_with_sources(question, user_ip="streamlit-frontend")
                 
                 # We need to process the stream manually to catch the metadata at the end
                 for result in stream_gen:
