@@ -10,6 +10,7 @@ Key Optimizations:
 
 import requests
 import json
+import os
 from app.query_resume import hybrid_search
 
 def generate_answer_with_sources(question: str):
@@ -55,6 +56,8 @@ def generate_answer_with_sources(question: str):
     confidence = "high" if (has_keyword_match or avg_score > 0.5) else "medium" if avg_score > 0.3 else "low"
 
     # 3. OPTIMIZED: Streamlined prompt and faster generation settings
+    ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    
     prompt = f"""You are Sahil's professional assistant. Answer briefly and professionally using the resume context below.
 
 Resume Context:
@@ -64,10 +67,10 @@ Question: {question}
 
 Answer (use **bold** for key terms, keep under 150 words):"""
 
-    print(f"🤖 [RAG] Streaming from Ollama (llama3.2 3B)...")
+    print(f"🤖 [RAG] Streaming from Ollama ({ollama_url})...")
     try:
         response = requests.post(
-            "http://localhost:11434/api/generate",
+            f"{ollama_url}/api/generate",
             json={
                 "model": "llama3.2",  # REVERTED to 3B for accuracy
                 "prompt": prompt,
