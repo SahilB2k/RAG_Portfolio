@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    env_file: .env
+    environment:
+      - APP_ENV=prod
+    # Ollama is expected to be running on the host machine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8501:8501"
+    env_file: .env
+    depends_on:
+      - api
+    environment:
+      - APP_ENV=prod
+      - BACKEND_URL=http://api:5000

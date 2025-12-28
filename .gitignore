@@ -1,13 +1,35 @@
-.venv/
-venv/
-.env/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
 .env
-data/
-package-lock.json
-package.json
 
-logs/
-*.log 
+# Temporary Files / Tool Outputs
+ngrok_output.json
+ngrok_output_2.json
+full_tunnels.json
+full_tunnels.json
+
+# Project Specific
+data/
 .data/
+logs/
+*.log
+
+# Mobile / Expo (Monorepo root safety)
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

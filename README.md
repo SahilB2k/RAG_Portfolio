@@ -1,54 +1,74 @@
+# Sahil Jadhav: AI-Powered Digital Twin (RAG) 🤖💼
 
-
----
-
-# Sahil Jadhav: AI-Powered Portfolio RAG 🤖💼
-
-**A Production-Grade Retrieval-Augmented Generation (RAG) System for Professional Identity**
+**A production-grade Retrieval-Augmented Generation (RAG) system acting as a professional "Digital Twin."**
 
 ---
 
 ## 🌟 Overview
 
-This project is a high-performance **RAG (Retrieval-Augmented Generation)** application designed to act as a "Digital Twin." Unlike standard chatbots, this system uses a hybrid search architecture to provide 100% accurate, source-cited information from my resume, ensuring recruiters and interviewers get the data they need instantly.
+This project is a high-performance **RAG** application designed to represent me professionally. It uses a hybrid search architecture to provide 100% accurate, source-cited information from my resume, ensuring recruiters and interviewers get the data they need instantly via **Web** and **Mobile**.
 
-### 🎥 Live Demo (UI)
-
-<!-- > **Insert a screenshot of your Streamlit UI here**
-> `![Application UI](C:\Users\sahil jadhav\OneDrive\Documents\resume_rag\assets\UI.png)` -->
+### 🎥 Key Features
+*   **Hybrid Search**: Combines semantic vector search (BGE-Small) with keyword matching for zero-miss retrieval.
+*   **Contextual Chunking**: Breaks down resume sections into atomic, context-enriched pieces.
+*   **Real-time Streaming**: Chat responses stream token-by-token for a "ChatGPT-like" experience.
+*   **Cross-Platform**: Modern **Streamlit Web Dashboard** + **Expo Mobile App**.
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **LLM:** Llama 3.2 (via Ollama)
-* **Embedding Model:** BGE-Small-v1.5 (SOTA for efficiency)
-* **Vector Database:** Supabase (pgvector)
-* **Orchestration:** Python, Psycopg2
-* **Frontend:** Streamlit
+*   **LLM Engine:** Llama 3.2 (via Ollama)
+*   **Vector Database:** Supabase (pgvector)
+*   **Backend API:** Flask (Production-hardened with Gunicorn & Gevent)
+*   **Frontend:** Streamlit (Web) & Expo/React Native (Mobile)
+*   **Infrastucture:** Docker & Docker Compose
 
 ---
 
-## 🚀 Key Engineering Features
+## 🚀 Quick Start (Development)
 
-### 1. Hybrid Search Architecture
+### 1. Prerequisites
+*   [Ollama](https://ollama.ai/) installed and running (`ollama pull llama3.2`)
+*   Python 3.10+
+*   Node.js & npm (for Mobile)
 
-To prevent the "information miss" common in standard vector searches, I implemented a **Hybrid Retrieval** system. It combines:
+### 2. Setup
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/resume-rag.git
+cd resume-rag
 
-* **Semantic Search:** Captures the "meaning" of queries using BGE embeddings.
-* **Keyword Matching:** Uses SQL `ILIKE` patterns to ensure specific technical terms (e.g., "CGPA", "TensorFlow") are never missed.
+# Install Python dependencies
+pip install -r requirements.txt
 
-### 2. Contextual & Atomic Chunking
+# Start the Flask Backend
+python -m app.api
+```
 
-Instead of uploading a single block of text, the system:
+### 3. Mobile App (Expo)
+```bash
+cd mobile
+npm install
+npx expo start --tunnel
+```
+*Note: Run `python update_tunnel.py` in the root folder whenever your ngrok URL changes.*
 
-* Splits the resume into **Atomic Chunks** based on Markdown headers.
-* **Enriches** every chunk with a global context (e.g., "Sahil Jadhav's Project Experience: ...") so data is never "orphaned" during retrieval.
+---
 
-### 3. Interviewer-Optimized Retrieval
+## 🏗️ Production Deployment (Docker)
 
-* **Broad Coverage:** Configured with `top_k=15` to ensure the LLM has a holistic view of the resume for broad questions.
-* **Strict Persona:** The LLM is programmed as a "Career Proxy" to provide concise, bulleted summaries instead of long, unnecessary paragraphs.
+To run the entire stack in a productionalized environment:
+
+```bash
+docker-compose up --build -d
+```
+
+| Service | Endpoint |
+| :--- | :--- |
+| **Backend API** | `http://localhost:5000` |
+| **Streamlit UI** | `http://localhost:8501` |
+| **Health Check** | `http://localhost:5000/health` |
 
 ---
 
@@ -56,93 +76,32 @@ Instead of uploading a single block of text, the system:
 
 ```bash
 resume_rag/
-├── app/
-│   ├── db.py               # Supabase connection logic
-│   ├── embeddings.py       # BGE-Small model integration
-│   ├── ingest_resume.py    # Contextual chunking & database loading
-│   ├── query_resume.py     # Hybrid (Vector + Keyword) search
-│   ├── rag_answer.py       # LLM prompt engineering & Ollama bridge
-│   └── ui.py               # Streamlit web interface
-├── data/
-│   └── resume.md           # Source data in Markdown
-└── requirements.txt        # Project dependencies
-└── .env       
-
-
-
+├── app/                  # 🧠 Backend & RAG Logic
+│   ├── api.py            # Flask API (Streaming capable)
+│   ├── config.py         # Centralized environment config
+│   ├── rag_answer.py     # Prompt engineering & LLM bridge
+│   └── streamlit_app.py  # Web Interface
+├── mobile/               # 📱 Expo Mobile App
+│   ├── app/(tabs)/       # Chat UI Screens
+│   └── services/api.ts   # Mobile-to-Backend service
+├── data/                 # 📄 Source Artifacts (resume.md)
+├── Dockerfile            # Production API image
+├── Dockerfile.ui         # Production Streamlit image
+└── update_tunnel.py      # Automated DX tool for mobile tunnels
 ```
 
 ---
 
-## 🔧 Installation & Setup
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/yourusername/resume-rag.git
-cd resume-rag
-
-```
-
-
-2. **Install Dependencies:**
-```bash
-pip install -r requirements.txt
-pull llama3.2 from ollama(ollama pull llama3.2)
-
-```
-
-
-3. **Database Setup:**
-* Create a Supabase project and enable `pgvector`.
-* Run the SQL scripts provided in `app/db.py` to create the `resume_chunks` table and the `match_resume_chunks` function.
-
-
-4. **Environment Variables:**
-Create a `.env` file:
+## 📝 Configuration
+Create a `.env` file in the root:
 ```env
-
-DATABASE_URL=your_supabase_url
-
+DATABASE_URL=your_supabase_postgresql_url
+APP_ENV=dev
+CORS_ORIGINS=*
 ```
-
-
-5. **Ingest Data:**
-```bash
-python -m app.ingest_resume
-
-```
-
-6. **Run the project in terminal:**
-```bash
-python -m app.query_resume
-
-```
-
-6. **Run UI:**
-```bash
-streamlit run app/streamlit_app.py
-
-```
-
-
 
 ---
 
-## 📊 Performance Testing
-
-| Query Type | Retrieval Strategy | Accuracy |
-| --- | --- | --- |
-| Specific Fact (e.g., 10th %) | Keyword Match | 100% |
-| Broad Summary (e.g., Projects) | Vector (top_k=15) | 100% |
-| Complex Reasoning | Hybrid + Llama 3.2 | High |
-
----
-
-## 🖥️ User Interface
-![Sahil's AI Resume Assistant Demo](assets/UI.png)
-![Backend Results:](assets/terminal_output1.png)
-![Backend Results:](assets/terminal_output2.png)
-
-
-
-
+## 🙌 Author
+**Sahil Jadhav**  
+*AI/ML Engineer*

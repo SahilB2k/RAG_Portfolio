@@ -1,291 +1,3 @@
-# """
-# Streamlit Web Interface for Resume RAG System
-# Professional, interview-ready UI with source transparency
-# """
-
-# import streamlit as st
-# import sys
-# from pathlib import Path
-
-# # Add PROJECT ROOT to Python path
-# sys.path.append(str(Path(__file__).parent.parent))
-
-# from app.rag_answer import generate_answer
-# from app.query_resume import query_resume, hybrid_search
-
-
-# # Page configuration
-# st.set_page_config(
-#     page_title="Sahil Jadhav - AI Resume Assistant",
-#     page_icon="🤖",
-#     layout="wide",
-#     initial_sidebar_state="expanded"
-# )
-
-# # Custom CSS for professional appearance
-# st.markdown("""
-# <style>
-#     .main-header {
-#         font-size: 2.5rem;
-#         font-weight: bold;
-#         color: #1f77b4;
-#         text-align: center;
-#         margin-bottom: 0.5rem;
-#     }
-#     .sub-header {
-#         font-size: 1.2rem;
-#         color: #666;
-#         text-align: center;
-#         margin-bottom: 2rem;
-#     }
-#     .source-box {
-#         background-color: #f0f2f6;
-#         border-left: 4px solid #1f77b4;
-#         padding: 1rem;
-#         margin: 0.5rem 0;
-#         border-radius: 0.3rem;
-#     }
-#     .confidence-high {
-#         color: #28a745;
-#         font-weight: bold;
-#     }
-#     .confidence-medium {
-#         color: #ffc107;
-#         font-weight: bold;
-#     }
-#     .confidence-low {
-#         color: #dc3545;
-#         font-weight: bold;
-#     }
-# </style>
-# """, unsafe_allow_html=True)
-
-# # Initialize session state
-# if 'chat_history' not in st.session_state:
-#     st.session_state.chat_history = []
-# if 'show_sources' not in st.session_state:
-#     st.session_state.show_sources = True
-
-# # Header
-# st.markdown('<div class="main-header">🤖 Sahil Jadhav - AI Resume Assistant</div>', unsafe_allow_html=True)
-# st.markdown('<div class="sub-header">Ask me anything about my background, skills, projects, and experience</div>', unsafe_allow_html=True)
-
-# # Sidebar
-# with st.sidebar:
-#     st.header("⚙️ Settings")
-    
-#     search_mode = st.radio(
-#         "Search Mode",
-#         ["Hybrid (Recommended)", "Vector Only"],
-#         help="Hybrid combines semantic and keyword search for better accuracy"
-#     )
-    
-#     show_sources = st.checkbox(
-#         "Show Sources",
-#         value=True,
-#         help="Display which resume sections were used to generate the answer"
-#     )
-#     st.session_state.show_sources = show_sources
-    
-#     show_debug = st.checkbox(
-#         "Show Debug Info",
-#         value=False,
-#         help="Display technical details about retrieval process"
-#     )
-    
-#     st.divider()
-    
-#     st.header("📋 Sample Questions")
-#     sample_questions = [
-#         "What are all of Sahil's projects?",
-#         "What was Sahil's academic performance?",
-#         "What technical skills does Sahil have?",
-#         "Tell me about the Image Forgery Detection project",
-#         "What certifications does Sahil have?",
-#         "What programming languages does Sahil know?"
-#     ]
-    
-#     for question in sample_questions:
-#         if st.button(question, key=f"sample_{question}", use_container_width=True):
-#             st.session_state.current_question = question
-    
-#     st.divider()
-    
-#     # Stats
-#     st.header("📊 System Stats")
-#     try:
-#         from app.db import get_connection
-#         conn = get_connection()
-#         cur = conn.cursor()
-#         cur.execute("SELECT COUNT(*) FROM resume_chunks;")
-#         chunk_count = cur.fetchone()[0]
-#         cur.close()
-#         conn.close()
-        
-#         st.metric("Resume Chunks", chunk_count)
-#         st.info("System Status: ✅ Online")
-#     except Exception as e:
-#         st.error("System Status: ❌ Database Error")
-#         if show_debug:
-#             st.error(f"Error: {e}")
-    
-#     # Clear chat button
-#     if st.button("🗑️ Clear Chat History", use_container_width=True):
-#         st.session_state.chat_history = []
-#         st.rerun()
-
-# # Main chat interface
-# st.header("💬 Chat Interface")
-
-# # Display chat history
-# for message in st.session_state.chat_history:
-#     with st.chat_message(message["role"]):
-#         st.markdown(message["content"])
-        
-#         # Show sources if available
-#         if message["role"] == "assistant" and "sources" in message and st.session_state.show_sources:
-#             with st.expander("📚 View Sources"):
-#                 for idx, source in enumerate(message["sources"], 1):
-#                     st.markdown(f"""
-#                     <div class="source-box">
-#                         <strong>Source {idx}: {source['section']}</strong><br>
-#                         Relevance: {source['relevance']}<br>
-#                         <em>{source['preview']}</em>
-#                     </div>
-#                     """, unsafe_allow_html=True)
-
-# # Chat input
-# question = st.chat_input("Ask me anything about Sahil's resume...")
-
-# # Handle sample question button clicks
-# if 'current_question' in st.session_state:
-#     question = st.session_state.current_question
-#     del st.session_state.current_question
-
-# # Process question
-# if question:
-#     # Add user message to chat
-#     st.session_state.chat_history.append({
-#         "role": "user",
-#         "content": question
-#     })
-    
-#     # Display user message
-#     with st.chat_message("user"):
-#         st.markdown(question)
-    
-#     # Generate answer with loading indicator
-#     with st.chat_message("assistant"):
-#         with st.spinner("🤔 Analyzing resume..."):
-#             try:
-#                 use_hybrid = (search_mode == "Hybrid (Recommended)")
-                
-#                 # Generate answer with sources
-#                 result = generate_answer_with_sources(question)
-                
-#                 # Display answer
-#                 st.markdown(result['answer'])
-                
-#                 # Display confidence badge
-#                 confidence = result['confidence']
-#                 confidence_class = f"confidence-{confidence}"
-#                 st.markdown(f"""
-#                 <div style="margin-top: 1rem;">
-#                     <span class="{confidence_class}">Confidence: {confidence.upper()}</span>
-#                     <span style="color: #666; margin-left: 1rem;">
-#                         ({result['total_chunks']} sources analyzed)
-#                     </span>
-#                 </div>
-#                 """, unsafe_allow_html=True)
-                
-#                 # Add to chat history with sources
-#                 st.session_state.chat_history.append({
-#                     "role": "assistant",
-#                     "content": result['answer'],
-#                     "sources": result['sources'],
-#                     "confidence": confidence
-#                 })
-                
-#                 # Show sources immediately if enabled
-#                 if st.session_state.show_sources and result['sources']:
-#                     with st.expander("📚 View Sources", expanded=False):
-#                         for idx, source in enumerate(result['sources'], 1):
-#                             st.markdown(f"""
-#                             <div class="source-box">
-#                                 <strong>Source {idx}: {source['section']}</strong><br>
-#                                 Relevance: {source['relevance']}<br>
-#                                 <em>{source['preview']}</em>
-#                             </div>
-#                             """, unsafe_allow_html=True)
-                
-#                 # Debug info
-#                 if show_debug:
-#                     with st.expander("🔧 Debug Information"):
-#                         st.json({
-#                             "search_mode": search_mode,
-#                             "chunks_retrieved": result['total_chunks'],
-#                             "confidence": confidence,
-#                             "sources_used": len(result['sources'])
-#                         })
-                
-#             except Exception as e:
-#                 error_msg = f"❌ Error generating answer: {str(e)}"
-#                 st.error(error_msg)
-                
-#                 st.session_state.chat_history.append({
-#                     "role": "assistant",
-#                     "content": error_msg
-#                 })
-                
-#                 if show_debug:
-#                     st.exception(e)
-
-# # Footer
-# st.divider()
-# col1, col2, col3 = st.columns(3)
-
-# with col1:
-#     st.markdown("**💡 Tip:** Use specific questions for best results")
-
-# with col2:
-#     st.markdown("**🔍 Hybrid Search:** Enabled for comprehensive answers")
-
-# with col3:
-#     st.markdown("**📊 Model:** BGE-Small-v1.5 + Llama 3.2")
-
-# # About section
-# with st.expander("ℹ️ About This System"):
-#     st.markdown("""
-#     ### How It Works
-    
-#     This AI Resume Assistant uses **Retrieval-Augmented Generation (RAG)** to answer questions about Sahil Jadhav's resume:
-    
-#     1. **Embedding Generation**: Your question is converted to a vector using BGE-Small-v1.5
-#     2. **Hybrid Search**: Combines semantic search (meaning) + keyword search (exact terms)
-#     3. **Context Building**: Retrieves 15+ relevant resume sections
-#     4. **Answer Generation**: Llama 3.2 analyzes all sections and provides a comprehensive answer
-#     5. **Source Attribution**: Shows which resume sections were used
-    
-#     ### Technical Stack
-#     - **Vector Database**: Supabase (pgvector)
-#     - **Embedding Model**: BGE-Small-v1.5 (SOTA semantic search)
-#     - **LLM**: Llama 3.2 via Ollama
-#     - **Frontend**: Streamlit
-#     - **Search**: Hybrid (Vector + Keyword BM25)
-    
-#     ### Features
-#     - ✅ Comprehensive retrieval (15 chunks per query)
-#     - ✅ Source transparency (shows where info came from)
-#     - ✅ Confidence scoring (high/medium/low)
-#     - ✅ Hybrid search (never misses specific terms)
-#     - ✅ Chat history (conversational interface)
-#     """)
-
-# # Run instructions
-# if __name__ == "__main__":
-#     st.info("💡 **Running locally?** Start with: `streamlit run app/streamlit_app.py`")
-
-
 """
 Streamlit Web Interface for Resume RAG System
 Modern, AI-focused UI with sophisticated dark theme
@@ -298,8 +10,6 @@ from pathlib import Path
 # Add PROJECT ROOT to Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.rag_answer import generate_answer
-from app.query_resume import query_resume, hybrid_search
 from app.rag_answer import generate_answer_with_sources
 
 
@@ -609,14 +319,17 @@ for message in st.session_state.chat_history:
         # Show sources if available
         if message["role"] == "assistant" and "sources" in message and st.session_state.show_sources:
             with st.expander("📚 View Sources", expanded=False):
+                # Using a single markdown block for all sources in the expander for cleaner rendering
+                sources_html = ""
                 for idx, source in enumerate(message["sources"], 1):
-                    st.markdown(f"""
+                    sources_html += f"""
                     <div class="source-box">
                         <strong>Source {idx}: {source['section']}</strong><br>
-                        <span style="color: #94a3b8;">Relevance: {source['relevance']}</span><br>
-                        <em style="color: #cbd5e1;">{source['preview']}</em>
+                        <span style="color: #60a5fa; font-size: 0.85rem;">Relevance Score: {source['relevance']}</span><br>
+                        <em style="color: #cbd5e1; font-size: 0.9rem;">"{source['preview']}"</em>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """
+                st.markdown(sources_html, unsafe_allow_html=True)
 
 # Chat input
 question = st.chat_input("Ask me anything about Sahil's resume...")
@@ -629,80 +342,77 @@ if 'current_question' in st.session_state:
 # Process question
 if question:
     # Add user message to chat
-    st.session_state.chat_history.append({
-        "role": "user",
-        "content": question
-    })
+    st.session_state.chat_history.append({"role": "user", "content": question})
     
-    # Display user message
     with st.chat_message("user"):
         st.markdown(question)
     
-    # Generate answer with loading indicator
     with st.chat_message("assistant"):
-        with st.spinner("🤔 Analyzing resume data..."):
+        with st.spinner("🤔 Thinking..."):
+            # 1. Create a placeholder for the streaming text
+            answer_placeholder = st.empty()
+            full_answer = ""
+            metadata = None
+            
+            # 2. Consume the stream
             try:
-                use_hybrid = (search_mode == "Hybrid (Recommended)")
+                # This is the generator from rag_answer.py
+                stream_gen = generate_answer_with_sources(question)
                 
-                # Generate answer with sources
-                result = generate_answer_with_sources(question)
+                # We need to process the stream manually to catch the metadata at the end
+                for result in stream_gen:
+                    chunk = result.get("answer_chunk", "")
+                    full_answer += chunk
+                    # Update placeholder with current full text
+                    answer_placeholder.markdown(full_answer + "▌")
+                    
+                    # Check for metadata (sent as the last yield)
+                    if result.get("metadata"):
+                        metadata = result["metadata"]
                 
-                # Display answer
-                st.markdown(result['answer'])
+                # Final render without cursor
+                answer_placeholder.markdown(full_answer)
                 
-                # Display confidence badge
-                confidence = result['confidence']
-                confidence_class = f"confidence-{confidence}"
-                st.markdown(f"""
-                <div class="confidence-badge {confidence_class}">
-                    {confidence.upper()} CONFIDENCE
-                </div>
-                <span style="color: #64748b; margin-left: 1rem; font-size: 0.85rem;">
-                    {result['total_chunks']} sources analyzed
-                </span>
-                """, unsafe_allow_html=True)
-                
-                # Add to chat history with sources
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": result['answer'],
-                    "sources": result['sources'],
-                    "confidence": confidence
-                })
-                
-                # Show sources immediately if enabled
-                if st.session_state.show_sources and result['sources']:
-                    with st.expander("📚 View Sources", expanded=False):
-                        for idx, source in enumerate(result['sources'], 1):
-                            st.markdown(f"""
-                            <div class="source-box">
-                                <strong>Source {idx}: {source['section']}</strong><br>
-                                <span style="color: #94a3b8;">Relevance: {source['relevance']}</span><br>
-                                <em style="color: #cbd5e1;">{source['preview']}</em>
-                            </div>
-                            """, unsafe_allow_html=True)
-                
-                # Debug info
-                if show_debug:
-                    with st.expander("🔧 Debug Information"):
-                        st.json({
-                            "search_mode": search_mode,
-                            "chunks_retrieved": result['total_chunks'],
-                            "confidence": confidence,
-                            "sources_used": len(result['sources'])
-                        })
-                
+                # 3. Post-process metadata (Confidence & Sources)
+                if metadata:
+                    confidence = metadata['confidence']
+                    st.markdown(f"""
+                    <div class="confidence-badge confidence-{confidence}">
+                        {confidence.upper()} CONFIDENCE
+                    </div>
+                    <span style="color: #64748b; margin-left: 1rem; font-size: 0.85rem;">
+                        {metadata['total_chunks']} sources analyzed
+                    </span>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.session_state.show_sources and metadata['sources']:
+                        with st.expander("📚 View Sources", expanded=False):
+                            sources_html = ""
+                            for idx, source in enumerate(metadata['sources'], 1):
+                                sources_html += f"""
+                                <div class="source-box">
+                                    <strong>Source {idx}: {source['section']}</strong><br>
+                                    <span style="color: #60a5fa; font-size: 0.85rem;">Relevance Score: {source['relevance']}</span><br>
+                                    <em style="color: #cbd5e1; font-size: 0.9rem;">"{source['preview']}"</em>
+                                </div>
+                                """
+                            st.markdown(sources_html, unsafe_allow_html=True)
+                    
+                    # Add to chat history
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": full_answer,
+                        "sources": metadata['sources'],
+                        "confidence": confidence
+                    })
+
+                if show_debug and metadata:
+                    with st.expander("🔧 Debug Info"):
+                        st.json(metadata)
+                        
             except Exception as e:
-                error_msg = f"❌ Error generating answer: {str(e)}"
-                st.error(error_msg)
-                
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": error_msg
-                })
-                
-                if show_debug:
-                    st.exception(e)
+                st.error(f"❌ Error: {str(e)}")
+                st.session_state.chat_history.append({"role": "assistant", "content": f"Error: {str(e)}"})
 
 # Footer
 st.divider()
@@ -742,8 +452,8 @@ with st.expander("ℹ️ About This System"):
     **Architecture:**
     1. **Embedding Generation** - BGE-Small-v1.5 converts your query to semantic vectors
     2. **Hybrid Search** - Combines semantic similarity + keyword matching (BM25)
-    3. **Context Retrieval** - Fetches 15+ most relevant resume sections
-    4. **Answer Generation** - Llama 3.2 synthesizes comprehensive responses
+    3. **Context Retrieval** - Fetches most relevant resume sections
+    4. **Answer Generation** - Llama 3.2 via Ollama API synthesizes comprehensive responses
     5. **Source Attribution** - Full transparency on information sources
     
     ### 🛠️ Technical Stack
@@ -757,40 +467,12 @@ with st.expander("ℹ️ About This System"):
     | **Search** | Hybrid (Vector + BM25) |
     
     ### ✨ Key Features
-    - ✅ Comprehensive retrieval (15 chunks per query)
+    - ✅ High-impact retrieval
     - ✅ Source transparency with preview
     - ✅ Confidence scoring (high/medium/low)
     - ✅ Hybrid search (never misses keywords)
-    - ✅ Chat history & context
-    - ✅ Real-time status monitoring
+    - ✅ Modern, premium dark theme UI
     """)
-
-# Helper function placeholder
-def generate_answer_with_sources(question):
-    """
-    Placeholder for the actual RAG function.
-    Replace this with your actual implementation that returns:
-    {
-        'answer': str,
-        'confidence': str,  # 'high', 'medium', or 'low'
-        'total_chunks': int,
-        'sources': [{'section': str, 'relevance': str, 'preview': str}]
-    }
-    """
-    # This should call your actual RAG pipeline
-    # For now, returning a dummy structure
-    return {
-        'answer': 'This is where your RAG answer would appear.',
-        'confidence': 'high',
-        'total_chunks': 15,
-        'sources': [
-            {
-                'section': 'Skills Section',
-                'relevance': '95%',
-                'preview': 'Python, Machine Learning, NLP...'
-            }
-        ]
-    }
 
 # Run instructions
 if __name__ == "__main__":

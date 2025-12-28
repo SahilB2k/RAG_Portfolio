@@ -1,96 +1,146 @@
-import subprocess
-import os
-from app.query_resume import hybrid_search
-
-
-def clean_text(text: str) -> str:
-    return text.encode("utf-8", errors="ignore").decode("utf-8")
-
-
-def generate_answer(question: str) -> str:
-    # 1. Get more chunks (top_k=7) to ensure nothing is missed
-    retrieved_chunks = hybrid_search(question, top_k=10)
-
-    # 2. Lower threshold significantly (0.20) for the Librarian
-    relevant_text = "\n---\n".join([c[0] for c in retrieved_chunks if c[1] > 0.20])
-
-    if not relevant_text:
-        return "I couldn't find a direct match. Could you try rephrasing?"
-
-    prompt = f"""
-<|system|>
-You are "Sahil's AI Proxy"—a professional, highly intelligent representative of Sahil Jadhav.
-Your goal is to answer ANY question an interviewer might ask based on the provided Resume Context.
-
-DATA SCOPE:
-- Education (10th, 12th, CGPA, College)
-- Technical Skills (Languages, Frameworks, Tools)
-- Projects (Detailed descriptions, technologies used, outcomes)
-- Certifications & Achievements (NPTEL, Leadership, Hackathons)
-
-INSTRUCTIONS:
-1. Scan the entire Context for the answer.
-2. If asked about multiple things (e.g., projects AND grades), address BOTH.
-3. Use a professional, confident tone as if you are recommending Sahil for a job.
-4. If a specific detail (like a exact percentage) is missing, say: "That specific detail isn't in the resume, but Sahil is a [Year] student at [College] with a focus on AI."
-
-FORMATTING RULES:
-1. Use a **bulleted list** for projects.
-2. For each project, provide a **1-sentence summary** followed by a list of **technologies used**.
-3. Be concise. Avoid long paragraphs.
-4. If asked about "all projects," ensure every project from the context is included.
-
-Resume Context:
-{relevant_text}
-<|user|>
-Question: {question}
-<|assistant|>
+"""
+Optimized rag_answer.py - Faster Response on CPU
+Key Optimizations:
+1. Reverted to llama3.2 (3B) for accuracy
+2. Reduced num_ctx to 1024 (faster evaluation)
+3. Set num_predict to 150 (prevent over-generation)
+4. Streamlined prompt
+5. Reduced top_k to 6 for faster retrieval
 """
 
-    context = "\n---\n".join(chunk for chunk, score , _ in retrieved_chunks)
-
-    if not context:
-        return "I'm sorry, I couldn't find that in the resume."
-
-
-    result = subprocess.run(
-        ["ollama", "run", "llama3.2"],
-        input=prompt,
-        text=True,
-        encoding="utf-8",
-        capture_output=True,
-        env={
-            **os.environ,
-            "OLLAMA_NUM_CTX": "2048",      # CPU optimized
-            "OLLAMA_NUM_THREADS": "6"     # Best for i5-1235U
-        }
-    )
-
-    return result.stdout.strip()
+import requests
+import json
+from app.query_resume import hybrid_search
 
 def generate_answer_with_sources(question: str):
     """
-    Streamlit-facing wrapper:
-    Returns answer + sources + confidence + total_chunks
+    Optimized RAG generator: Streams the answer for low-latency hardware.
+    Yields dicts with either 'answer_chunk' (text) or 'metadata' (sources/confidence).
     """
+    # 1. OPTIMIZED: Reduced top_k from 7 to 6 for even faster retrieval
+    print(f"\n🔍 [RAG] Received Question: {question}")
+    retrieved_chunks = hybrid_search(question, top_k=6)
+    
+    # 2. Filter and prepare context
+    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.22]
+    print(f"✅ [RAG] Found {len(relevant_chunks)} relevant chunks")
+    
+    if not relevant_chunks:
+        yield {
+            "answer_chunk": "I couldn't find specific information in Sahil's resume to answer that precisely. Is there something else I can help you with?", 
+            "metadata": None
+        }
+        return
 
-    result = generate_answer(question)
+    # Prepare context (limit to top 5 chunks for faster processing)
+    top_chunks = relevant_chunks[:5]
+    context_text = "\n---\n".join([c[0] for c in top_chunks])
+    
+    # Build sources metadata
+    sources = []
+    for content, score, search_type in top_chunks:
+        section = "Resume Section"
+        if ":" in content and len(content.split(":")[0]) < 50:
+            section = content.split(":")[0]
+        sources.append({
+            "section": section,
+            "relevance": f"{int(score * 100)}%" if search_type == 'vector' else "100%",
+            "preview": content[:120].strip() + "..."
+        })
 
-    # Defensive defaults to avoid crashes
-    answer = result.get("answer", "")
-    sources = result.get("sources", [])
-    confidence = result.get("confidence", "medium")
+    # Confidence calculation
+    vector_chunks = [rc for rc in top_chunks if rc[2] == 'vector']
+    avg_score = sum(c[1] for c in vector_chunks) / len(vector_chunks) if vector_chunks else 0
+    has_keyword_match = any(rc[2] == 'keyword' for rc in top_chunks)
+    confidence = "high" if (has_keyword_match or avg_score > 0.5) else "medium" if avg_score > 0.3 else "low"
 
-    return {
-        "answer": answer,
-        "sources": sources,
-        "confidence": confidence,
-        "total_chunks": len(sources)
-    }
+    # 3. OPTIMIZED: Streamlined prompt and faster generation settings
+    prompt = f"""You are Sahil's professional assistant. Answer briefly and professionally using the resume context below.
 
+Resume Context:
+{context_text}
+
+Question: {question}
+
+Answer (use **bold** for key terms, keep under 150 words):"""
+
+    print(f"🤖 [RAG] Streaming from Ollama (llama3.2 3B)...")
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "llama3.2",  # REVERTED to 3B for accuracy
+                "prompt": prompt,
+                "stream": True,
+                "options": {
+                    "num_ctx": 1024,      # REDUCED from 2048 (faster evaluation)
+                    "num_predict": 150,   # LIMIT generation length
+                    "temperature": 0.2,
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1
+                }
+            },
+            stream=True,
+            timeout=120
+        )
+        response.raise_for_status()
+        
+        full_answer = ""
+        for line in response.iter_lines():
+            if line:
+                chunk = json.loads(line)
+                text_chunk = chunk.get("response", "")
+                full_answer += text_chunk
+                yield {"answer_chunk": text_chunk, "metadata": None}
+                
+                if chunk.get("done"):
+                    break
+        
+        # Yield metadata at the end
+        yield {
+            "answer_chunk": "", 
+            "metadata": {
+                "sources": sources,
+                "confidence": confidence,
+                "total_chunks": len(sources)
+            }
+        }
+        print(f"✨ [RAG] Stream complete ({len(full_answer)} chars)")
+        
+    except requests.exceptions.Timeout:
+        print(f"⏱️ [RAG] Timeout - Consider reducing context further")
+        yield {"answer_chunk": "Request timed out. Please try asking a more specific question.", "metadata": None}
+    except Exception as e:
+        print(f"❌ [RAG] Error: {e}")
+        yield {"answer_chunk": f"An error occurred while generating the answer. Please try again.", "metadata": None}
+
+
+def generate_answer(question: str) -> str:
+    """
+    Legacy wrapper (Non-streaming) - returns full answer as string
+    """
+    full_text = ""
+    for chunk in generate_answer_with_sources(question):
+        full_text += chunk.get("answer_chunk", "")
+    return full_text
 
 
 if __name__ == "__main__":
-    question = input("Enter your question about the resume: ")
-    print("\n🤖 Answer:\n")
-    print(generate_answer(question))
+    print("Testing Optimized Streaming RAG...")
+    print("-" * 60)
+    
+    test_questions = [
+        "Tell me about Sahil's projects",
+        "What is Sahil's CGPA?",
+        "What technologies does Sahil know?"
+    ]
+    
+    for question in test_questions:
+        print(f"\nQ: {question}")
+        print("A: ", end="", flush=True)
+        for chunk in generate_answer_with_sources(question):
+            if chunk.get("answer_chunk"):
+                print(chunk["answer_chunk"], end="", flush=True)
+            if chunk.get("metadata"):
+                print(f"\n[Confidence: {chunk['metadata']['confidence']} | Sources: {chunk['metadata']['total_chunks']}]")
+        print("\n" + "-" * 60)
