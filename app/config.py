@@ -10,6 +10,10 @@ class Config:
     # CORS Settings
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
     
+    # LLM API Keys
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    
     # Gunicorn / Production Settings
     PORT = int(os.getenv('PORT', 5000))
     DEBUG = APP_ENV == 'dev'
