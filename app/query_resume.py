@@ -54,8 +54,14 @@ def hybrid_search(question, top_k=12):
     Combines vector search with keyword matching
     Ensures specific terms (CGPA, project names) are prioritized
     """
+    print(f"🕵️‍♂️ [Search] Starting Hybrid Search for: {question}")
     # Step 1: Vector search (semantic understanding)
-    vector_results = query_resume(question, top_k=top_k)
+    try:
+        vector_results = query_resume(question, top_k=top_k)
+        print(f"📊 [Search] Vector search found {len(vector_results)} matches")
+    except Exception as e:
+        print(f"❌ [Search] Vector search failed: {e}")
+        vector_results = []
     
     # Step 2: Keyword search (exact term matching)
     keywords = extract_keywords(question)
