@@ -25,5 +25,4 @@ COPY . .
 EXPOSE 5000
 
 # Run with Gunicorn using gevent workers for streaming support
-# Ollama is expected to be running externally (host.docker.internal or provided IP)
-CMD ["gunicorn", "--worker-class", "gevent", "--workers", "1", "--bind", "0.0.0.0:$PORT", "--timeout", "120", "--keep-alive", "5", "app.api:app"]
+CMD gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:$PORT --timeout 120 --keep-alive 5 app.api:app
