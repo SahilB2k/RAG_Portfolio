@@ -2,36 +2,45 @@ import requests
 import os
 import json
 
-def send_resume_link_email(receiver_email, token):
-    """Sends a time-limited download link directly using Resend HTTP API"""
+def send_gate_notification(requester_email, token):
+    """
+    Part of 'resume_access_control' system (Internal Naming).
+    Sends a system-level notification to the owner to trigger the access gate.
+    """
     api_key = os.getenv("RESEND_API_KEY")
-    sender_email = os.getenv("SENDER_EMAIL") # e.g., "onboarding@resend.dev" or your verified domain
+    sender_email = os.getenv("SENDER_EMAIL") # This is also the receiver (the owner)
     
     if not api_key:
-        print("❌ [Email] Error: RESEND_API_KEY not found in environment.")
+        print("❌ [Access Gate] Error: RESEND_API_KEY missing.")
+        return False
+    
+    if not sender_email:
+        print("❌ [Access Gate] Error: SENDER_EMAIL missing.")
         return False
 
     base_url = "https://rag-portfolio-mvjo.onrender.com"
-    download_url = f"{base_url}/download_resume?token={token}"
+    # Internal naming: gate_control
+    control_url = f"{base_url}/gate_control/{token}"
     
-    subject = "📄 Resume Download Link - Sahil Jadhav"
+    subject = f"[System] Resume Access Request: {requester_email}"
     
     body = f"""
-    Hello,
+    A new resume access request has been initiated.
     
-    Thank you for your interest in Sahil Jadhav's profile! 
+    Requester: {requester_email}
     
-    You can download his resume using the secure link below. 
-    Note: This link is valid for one-time use and will expire in 10 minutes.
+    To enable access for this user, please clear the gate by clicking below:
+    {control_url}
     
-    Download Link:
-    {download_url}
-    
-    Best regards,
-    Sahil Jadhav's Digital Assistant
+    Note: This link is single-use and valid for 24 hours. 
+    If you do not recognize this request, no action is required.
     """
     
     try:
+        # Resend HTTP API
+        # Simple Display Name following 422 fix
+        from_field = f"Access Control <{sender_email}>"
+        
         response = requests.post(
             "https://api.resend.com/emails",
             headers={
@@ -39,8 +48,8 @@ def send_resume_link_email(receiver_email, token):
                 "Content-Type": "application/json",
             },
             json={
-                "from": f"Sahil's Assistant <{sender_email}>",
-                "to": [receiver_email],
+                "from": from_field,
+                "to": [sender_email], # Sent to the owner
                 "subject": subject,
                 "text": body,
             },
@@ -48,12 +57,12 @@ def send_resume_link_email(receiver_email, token):
         )
         
         if response.status_code in [200, 201]:
-            print(f"📧 [Email] Download link sent to {receiver_email} via Resend")
+            print(f"📧 [Access Gate] Notification sent to owner for {requester_email}")
             return True
         else:
-            print(f"❌ [Email] Resend API Error: {response.status_code} - {response.text}")
+            print(f"❌ [Access Gate] Resend API Error: {response.status_code} - {response.text}")
             return False
             
     except Exception as e:
-        print(f"❌ [Email] HTTP Request failed: {e}")
+        print(f"❌ [Access Gate] Notification failed: {e}")
         return False

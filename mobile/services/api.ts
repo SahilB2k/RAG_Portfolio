@@ -71,10 +71,20 @@ export async function askQuestion(question: string, mode: string = 'auto') {
 export async function requestResume(email: string) {
   try {
     const response = await axios.post(`${BASE_URL}/request_resume`, { email });
-    return response.data;
+    return response.data; // { status: 'success', token: '...', message: '...' }
   } catch (error) {
     console.error('Request Resume Error:', error);
     throw error;
+  }
+}
+
+export async function checkAccessStatus(token: string) {
+  try {
+    const response = await axios.get(`${BASE_URL}/check_access_status/${token}`);
+    return response.data.status; // 'pending', 'approved', 'used', etc.
+  } catch (error) {
+    console.error('Check Access Status Error:', error);
+    return 'error';
   }
 }
 

@@ -292,14 +292,16 @@ with st.sidebar:
             st.session_state.current_question = question
     
     st.divider()
-    st.sidebar.header("📄 Resume Download")
+    st.sidebar.header("🛡️ Resume Access Control")
     
-    if 'resume_success' not in st.session_state:
-        st.session_state.resume_success = False
+    if 'access_token' not in st.session_state:
+         st.session_state.access_token = None
+    if 'access_status' not in st.session_state:
+        st.session_state.access_status = None
 
-    if not st.session_state.resume_success:
-        email_inp = st.sidebar.text_input("Recruiter Email:", placeholder="recruiter@company.com", key="resume_email_input")
-        if st.sidebar.button("Send Download Link", use_container_width=True):
+    if st.session_state.access_token is None:
+        email_inp = st.sidebar.text_input("Professional Email:", placeholder="recruiter@company.com", key="resume_email_input")
+        if st.sidebar.button("Initiate Access Request", use_container_width=True):
             if email_inp and "@" in email_inp:
                 try:
                     import uuid
@@ -307,38 +309,94 @@ with st.sidebar:
                     import threading
                     from datetime import datetime, timedelta
                     from app.db import get_connection
-                    from app.email_service import send_resume_link_email
+                    from app.email_service import send_gate_notification
                     
-                    token = str(uuid.uuid4())
-                    expires_at = datetime.now() + timedelta(minutes=10)
-                    hashed_ip = hashlib.sha256("streamlit_user".encode()).hexdigest()
+                    user_ip = "streamlit_user" # Real IP would be better but requires custom components
+                    hashed_ip = hashlib.sha256(user_ip.encode()).hexdigest()
                     
                     conn = get_connection()
                     cur = conn.cursor()
+                    
+                    # 1. Rate Limiting Check
+                    one_hour_ago = datetime.now() - timedelta(hours=1)
                     cur.execute(
-                        """INSERT INTO resume_requests (email, token, status, expires_at, hashed_ip) 
-                           VALUES (%s, %s, 'pending', %s, %s)""",
-                        (email_inp, token, expires_at, hashed_ip)
+                        "SELECT count(*) FROM resume_requests WHERE hashed_ip = %s AND created_at > %s",
+                        (hashed_ip, one_hour_ago)
                     )
-                    conn.commit()
-                    cur.close()
-                    conn.close()
+                    request_count = cur.fetchone()[0]
                     
-                    thread = threading.Thread(target=send_resume_link_email, args=(email_inp, token))
-                    thread.start()
-                    
-                    st.session_state.resume_success = True
-                    st.rerun()
+                    if request_count >= 3:
+                        st.sidebar.error("Rate limit exceeded. Please wait an hour.")
+                        cur.close()
+                        conn.close()
+                    else:
+                        token = str(uuid.uuid4())
+                        expires_at = datetime.now() + timedelta(hours=24)
+                        
+                        cur.execute(
+                            """INSERT INTO resume_requests (email, token, status, expires_at, hashed_ip) 
+                               VALUES (%s, %s, 'pending', %s, %s)""",
+                            (email_inp, token, expires_at, hashed_ip)
+                        )
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+                        
+                        # Notify Sahil
+                        thread = threading.Thread(target=send_gate_notification, args=(email_inp, token))
+                        thread.start()
+                        
+                        st.session_state.access_token = token
+                        st.session_state.access_status = 'pending'
+                        st.rerun()
                 except Exception as e:
-                    st.sidebar.error(f"Error: {e}")
+                    st.sidebar.error(f"System error: {e}")
             else:
                 st.sidebar.error("Valid email required!")
+    
     else:
-        st.sidebar.success("✅ Download Link Sent!")
-        st.sidebar.info("Please check your email inbox (and spam folder) for Sahil's resume link. It expires in 10 minutes.")
-        if st.sidebar.button("Send to another email?"):
-            st.session_state.resume_success = False
-            st.rerun()
+        # Polling/Refresh UI
+        try:
+            from app.db import get_connection
+            from app.api import get_config
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT status FROM resume_requests WHERE token = %s", (st.session_state.access_token,))
+            res = cur.fetchone()
+            cur.close()
+            conn.close()
+            
+            status = res[0] if res else 'not_found'
+            
+            if status == 'pending':
+                st.sidebar.info("⏳ Your request is being processed.")
+                with st.sidebar:
+                    with st.spinner("Resume access will be enabled shortly..."):
+                        st.write("_This may take a moment. This helps ensure availability and prevent misuse._")
+                if st.sidebar.button("Refresh Access Status"):
+                    st.rerun()
+            
+            elif status == 'approved':
+                st.sidebar.success("✅ Access Enabled")
+                # Using the API download link
+                base_url = "https://rag-portfolio-mvjo.onrender.com"
+                download_url = f"{base_url}/download_resume?token={st.session_state.access_token}"
+                st.sidebar.link_button("🚀 Download Resume Now", download_url, use_container_width=True)
+                if st.sidebar.button("Request New Session"):
+                    st.session_state.access_token = None
+                    st.rerun()
+            
+            else:
+                 st.sidebar.warning(f"Request status: {status}")
+                 if st.sidebar.button("Try Again"):
+                    st.session_state.access_token = None
+                    st.rerun()
+                    
+        except Exception as e:
+            st.sidebar.error(f"Status check failed: {e}")
+            if st.sidebar.button("Reset"):
+                st.session_state.access_token = None
+                st.rerun()
     
     st.divider()
     

@@ -1,9 +1,9 @@
-import { useState } from "react"
-import { StyleSheet, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput } from "react-native"
+import { useState, useEffect, useRef } from "react"
+import { StyleSheet, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Linking } from "react-native"
 import { Text, View } from "@/components/Themed"
 import Colors from "@/constants/Colors"
 import { useColorScheme } from "react-native"
-import { requestResume } from "@/services/api"
+import { requestResume, checkAccessStatus, getDownloadUrl } from "@/services/api"
 import { Ionicons } from "@expo/vector-icons"
 
 export default function PortfolioScreen() {
@@ -11,23 +11,65 @@ export default function PortfolioScreen() {
   const [email, setEmail] = useState("")
   const [modalVisible, setModalVisible] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [accessPending, setAccessPending] = useState(false)
+  const [accessApproved, setAccessApproved] = useState(false)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+
+  const pollInterval = useRef<any>(null)
+
+  // System Internal: resume_access_control polling
+  useEffect(() => {
+    if (accessPending && accessToken && !accessApproved) {
+      pollInterval.current = setInterval(async () => {
+        const status = await checkAccessStatus(accessToken)
+        if (status === 'approved') {
+          setAccessApproved(true)
+          setAccessPending(false)
+          if (pollInterval.current) clearInterval(pollInterval.current)
+        }
+      }, 5000) // Poll every 5s
+    }
+
+    return () => {
+      if (pollInterval.current) clearInterval(pollInterval.current)
+    }
+  }, [accessPending, accessToken, accessApproved])
 
   const handleRequestResume = async () => {
     if (!email || !email.includes("@")) {
-      Alert.alert("Invalid Email", "Please enter a valid email address to receive the link.")
+      Alert.alert("Invalid Email", "Please enter a valid professional email address.")
       return
     }
 
     setLoading(true)
     try {
-      await requestResume(email)
-      setSuccess(true)
-      setModalVisible(false)
-    } catch (error) {
-      Alert.alert("Error", "Failed to send request. Is the server running?")
+      const response = await requestResume(email)
+      if (response.token) {
+        setAccessToken(response.token)
+        setAccessPending(true)
+        setModalVisible(false)
+      }
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Internal system error. Please try again later."
+      Alert.alert("Notice", msg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDownload = async () => {
+    if (accessToken) {
+      const url = getDownloadUrl(accessToken)
+      const supported = await Linking.canOpenURL(url)
+      if (supported) {
+        await Linking.openURL(url)
+        // Reset state after attempted download as it's single-use
+        setAccessApproved(false)
+        setAccessPending(false)
+        setAccessToken(null)
+      } else {
+        Alert.alert("Error", "Can't open download link.")
+      }
     }
   }
 
@@ -43,37 +85,53 @@ export default function PortfolioScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Resume Download</Text>
-        {!success ? (
+        <Text style={styles.sectionTitle}>Resume Access</Text>
+
+        {!accessPending && !accessApproved && (
           <TouchableOpacity
             style={[styles.downloadButton, { backgroundColor: Colors[colorScheme].tint }]}
             onPress={() => setModalVisible(true)}
           >
-            <Ionicons name="document-text-outline" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Request Resume Link</Text>
+            <Ionicons name="shield-checkmark-outline" size={20} color="#fff" />
+            <Text style={styles.buttonText}>Request Access</Text>
           </TouchableOpacity>
-        ) : (
+        )}
+
+        {accessPending && (
+          <View style={[styles.statusBox, { borderColor: Colors[colorScheme].tint }]}>
+            <ActivityIndicator size="small" color={Colors[colorScheme].tint} />
+            <Text style={[styles.statusText, { color: Colors[colorScheme].tint }]}>Request is being processed</Text>
+            <Text style={styles.subStatusText}>Resume access will be enabled shortly.</Text>
+            <Text style={styles.momentText}>This may take a moment...</Text>
+            <Text style={[styles.disclaimerText, { marginTop: 8 }]}>This helps ensure availability and prevent misuse.</Text>
+          </View>
+        )}
+
+        {accessApproved && (
           <View style={styles.statusBox}>
-            <Ionicons name="mail-unread-outline" size={24} color="#22c55e" />
-            <Text style={[styles.statusText, { color: "#22c55e" }]}>Email Sent!</Text>
-            <Text style={styles.subStatusText}>Please check your inbox (and spam) for the secure download link.</Text>
-            <TouchableOpacity onPress={() => setSuccess(false)} style={{ marginTop: 10 }}>
-              <Text style={{ color: Colors[colorScheme].tint, fontSize: 12 }}>Send to another email?</Text>
+            <Ionicons name="lock-open-outline" size={24} color="#22c55e" />
+            <Text style={[styles.statusText, { color: "#22c55e" }]}>Access Enabled</Text>
+            <TouchableOpacity
+              style={[styles.downloadButton, { backgroundColor: "#22c55e", width: '100%' }]}
+              onPress={handleDownload}
+            >
+              <Ionicons name="cloud-download-outline" size={20} color="#fff" />
+              <Text style={styles.buttonText}>Download Resume Now</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colorScheme === 'dark' ? '#1e293b' : '#fff' }]}>
-            <Text style={styles.modalTitle}>Where should I send the link?</Text>
-            <Text style={styles.modalSub}>Enter your professional email to receive a secure, one-time download link.</Text>
+            <Text style={styles.modalTitle}>Resume Access Control</Text>
+            <Text style={styles.modalSub}>Please enter your professional email to initiate the access verification workflow.</Text>
 
             <TextInput
               style={[
@@ -106,7 +164,7 @@ export default function PortfolioScreen() {
                 onPress={handleRequestResume}
                 disabled={loading}
               >
-                <Text style={styles.confirmText}>{loading ? "Sending..." : "Send Link"}</Text>
+                <Text style={styles.confirmText}>{loading ? "Processing..." : "Initiate Request"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -225,6 +283,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
     marginTop: 4,
+    textAlign: "center",
+  },
+  momentText: {
+    fontSize: 12,
+    opacity: 0.5,
+    fontStyle: "italic",
+    marginTop: 4,
+  },
+  disclaimerText: {
+    fontSize: 10,
+    color: "#94a3b8",
+    fontStyle: "italic",
     textAlign: "center",
   },
   modalOverlay: {
