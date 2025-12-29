@@ -142,6 +142,12 @@ export default function ChatScreen() {
         </Animated.View>
       )}
 
+      <View style={styles.disclaimerContainer}>
+        <Text style={styles.disclaimerText}>
+          My brain is slow since I was born just now... Please be patient! 👶
+        </Text>
+      </View>
+
       <View
         style={[
           styles.inputArea,
@@ -269,5 +275,16 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  disclaimerContainer: {
+    alignItems: "center",
+    paddingVertical: 5,
+    backgroundColor: "transparent",
+  },
+  disclaimerText: {
+    fontSize: 10,
+    color: "#94a3b8",
+    fontStyle: "italic",
+    textAlign: "center",
   },
 })

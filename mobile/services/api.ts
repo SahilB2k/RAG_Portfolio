@@ -65,3 +65,27 @@ export async function askQuestion(question: string) {
     throw error;
   }
 }
+
+export async function requestResume() {
+  try {
+    const response = await axios.post(`${BASE_URL}/request_resume`);
+    return response.data;
+  } catch (error) {
+    console.error('Request Resume Error:', error);
+    throw error;
+  }
+}
+
+export async function checkRequestStatus(requestId: string) {
+  try {
+    const response = await axios.get(`${BASE_URL}/check_request/${requestId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Check Status Error:', error);
+    throw error;
+  }
+}
+
+export function getDownloadUrl(requestId: string) {
+  return `${BASE_URL}/download_resume/${requestId}`;
+}

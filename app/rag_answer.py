@@ -144,7 +144,7 @@ def generate_answer_with_sources(question: str, user_ip: str = "unknown"):
             "preview": content[:120].strip() + "..."
         })
 
-    avg_score = sum(c[1] for rc in top_chunks if rc[2] == 'vector') / len([rc for rc in top_chunks if rc[2] == 'vector']) if [rc for rc in top_chunks if rc[2] == 'vector'] else 0
+    avg_score = sum(rc[1] for rc in top_chunks if rc[2] == 'vector') / len([rc for rc in top_chunks if rc[2] == 'vector']) if [rc for rc in top_chunks if rc[2] == 'vector'] else 0
     confidence = "high" if (any(rc[2] == 'keyword' for rc in top_chunks) or avg_score > 0.5) else "medium" if avg_score > 0.3 else "low"
 
     prompt = f"""You are Sahil's professional assistant. Answer briefly and professionally using the resume context below.
