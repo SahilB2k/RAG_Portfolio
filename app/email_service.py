@@ -2,6 +2,7 @@ import smtplib
 import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from datetime import datetime
 
 def send_approval_email(request_id, ip_address, user_agent):
     """Sends an approval request email to Sahil"""
@@ -15,6 +16,9 @@ def send_approval_email(request_id, ip_address, user_agent):
     
     subject = "📄 Resume Download Request - Sahil's Digital Twin"
     
+    # Use datetime instead of os.popen(date /t) for cross-platform compatibility
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     body = f"""
     Hello Sahil,
     
@@ -23,7 +27,7 @@ def send_approval_email(request_id, ip_address, user_agent):
     Requester Details:
     - IP Address: {ip_address}
     - User Agent: {user_agent}
-    - Timestamp: {os.popen('date /t').read().strip()} {os.popen('time /t').read().strip()}
+    - Timestamp: {timestamp}
     
     If you want to allow this download, click the link below:
     {approve_url}
@@ -39,7 +43,8 @@ def send_approval_email(request_id, ip_address, user_agent):
     msg.attach(MIMEText(body, 'plain'))
     
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        # Added timeout to prevent hanging the API
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
         server.starttls()
         server.login(sender_email, sender_password)
         text = msg.as_string()

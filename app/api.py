@@ -36,6 +36,8 @@ def ask():
 
     return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
 
+import threading
+
 @app.route('/request_resume', methods=['POST'])
 def request_resume():
     """Starts the approval flow for resume download"""
@@ -56,14 +58,18 @@ def request_resume():
         cur.close()
         conn.close()
         
-        # Send email to Sahil
-        email_sent = send_approval_email(request_id, user_ip, user_agent)
+        # Send email to Sahil in a background thread to avoid blocking the API response
+        # This makes the request "instant" for the user even if email connectivity is slow
+        thread = threading.Thread(
+            target=send_approval_email, 
+            args=(request_id, user_ip, user_agent)
+        )
+        thread.start()
         
         return jsonify({
             "status": "success",
             "request_id": request_id,
-            "message": "Approval request sent to Sahil.",
-            "email_sent": email_sent
+            "message": "Approval request initiated. Sahil will receive an email shortly.",
         }), 200
     except Exception as e:
         print(f"❌ [API] Error in request_resume: {e}")
