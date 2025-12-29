@@ -118,14 +118,26 @@ def generate_with_ollama(prompt):
             if chunk.get("done"):
                 break
 
-def generate_answer_with_sources(question: str, user_ip: str = "unknown"):
+def generate_answer_with_sources(question: str, user_ip: str = "unknown", mode: str = "auto"):
     """
     RAG generator with multi-provider fallback strategy: Groq -> Gemini -> Ollama
+    Supports 'Recruiter', 'Casual', and 'Auto' modes.
     """
-    print(f"\n🔍 [RAG] Processing Question: {question}")
-    # Search for top 6 (balanced for cloud LLM context window)
+    print(f"\n🔍 [RAG] Processing Question: {question} (Mode: {mode})")
+    
+    # Auto-detection logic if mode is 'auto'
+    recruiter_keywords = ["experience", "skills", "resume", "projects", "hire", "role", "internship", "work", "education"]
+    if mode == "auto":
+        if any(kw in question.lower() for kw in recruiter_keywords):
+            detected_mode = "recruiter"
+        else:
+            detected_mode = "casual"
+    else:
+        detected_mode = mode.lower()
+
+    # Search for top 6
     retrieved_chunks = hybrid_search(question, top_k=6)
-    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.15] # Lowered slightly for more recall
+    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.15]
     
     if not relevant_chunks:
         yield {"answer_chunk": "I couldn't find specific information in Sahil's resume to answer that precisely.", "metadata": None}
@@ -147,12 +159,27 @@ def generate_answer_with_sources(question: str, user_ip: str = "unknown"):
     avg_score = sum(rc[1] for rc in top_chunks if rc[2] == 'vector') / len([rc for rc in top_chunks if rc[2] == 'vector']) if [rc for rc in top_chunks if rc[2] == 'vector'] else 0
     confidence = "high" if (any(rc[2] == 'keyword' for rc in top_chunks) or avg_score > 0.5) else "medium" if avg_score > 0.3 else "low"
 
-    prompt = f"""You are Sahil's professional assistant. Answer briefly and professionally using the resume context below.
+    # Style Instructions based on detected mode
+    if detected_mode == "recruiter":
+        style_instruction = (
+            "Answer in a professional, concise tone. Use bullet points where appropriate. "
+            "Focus heavily on metrics, technical skills, project impact, and professional experience. "
+            "If relevant links (GitHub, LinkedIn, Portfolio) are found in the context, include them."
+        )
+    else:  # casual
+        style_instruction = (
+            "Answer in a friendly, conversational, and simple tone. Use approachable language "
+            "as if you are Sahil's digital twin chatting with a friend. Keep it brief but warm."
+        )
+
+    prompt = f"""You are Sahil's professional digital assistant. {style_instruction}
+Answer the question using the provided resume context. Use **bold** for key achievements or skills.
+
 Resume Context:
 {context_text}
 
 Question: {question}
-Answer (use **bold** for key terms, keep under 150 words):"""
+Answer:"""
 
     providers = [
         ("Groq", generate_with_groq),
@@ -162,7 +189,7 @@ Answer (use **bold** for key terms, keep under 150 words):"""
 
     success = False
     for name, func in providers:
-        print(f"🤖 [RAG] Attempting to generate with {name}...")
+        print(f"🤖 [RAG] Attempting style: {detected_mode} with {name}...")
         try:
             for text_chunk in func(prompt):
                 yield {"answer_chunk": text_chunk, "metadata": None}

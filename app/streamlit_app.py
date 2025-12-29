@@ -255,6 +255,13 @@ with st.sidebar:
         help="Hybrid combines semantic and keyword search for better accuracy"
     )
     
+    response_mode = st.selectbox(
+        "Response Mode",
+        ["Auto", "Casual", "Recruiter"],
+        help="Casual: Friendly twin | Recruiter: Professional bullet points | Auto: Swaps based on question"
+    )
+    st.session_state.response_mode = response_mode.lower()
+
     show_sources = st.checkbox(
         "Show Sources",
         value=True,
@@ -409,7 +416,11 @@ if question:
                 # This is the generator from rag_answer.py
                 # Note: Streamlit doesn't easily expose client IP without custom components,
                 # so we log as 'streamlit-frontend' for now.
-                stream_gen = generate_answer_with_sources(question, user_ip="streamlit-frontend")
+                stream_gen = generate_answer_with_sources(
+                    question, 
+                    user_ip="streamlit-frontend",
+                    mode=st.session_state.get('response_mode', 'auto')
+                )
                 
                 # We need to process the stream manually to catch the metadata at the end
                 for result in stream_gen:

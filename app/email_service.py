@@ -1,15 +1,16 @@
-import smtplib
+import requests
 import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+import json
 
 def send_resume_link_email(receiver_email, token):
-    """Sends a time-limited download link directly to the recruiter"""
-    sender_email = os.getenv("SENDER_EMAIL")
-    sender_password = os.getenv("SENDER_PASSWORD")
+    """Sends a time-limited download link directly using Resend HTTP API"""
+    api_key = os.getenv("RESEND_API_KEY")
+    sender_email = os.getenv("SENDER_EMAIL") # e.g., "onboarding@resend.dev" or your verified domain
     
-    # Direct link for the browser
+    if not api_key:
+        print("❌ [Email] Error: RESEND_API_KEY not found in environment.")
+        return False
+
     base_url = "https://rag-portfolio-mvjo.onrender.com"
     download_url = f"{base_url}/download_resume?token={token}"
     
@@ -30,19 +31,29 @@ def send_resume_link_email(receiver_email, token):
     Sahil Jadhav's Digital Assistant
     """
     
-    msg = MIMEMultipart()
-    msg['From'] = f"Sahil's Assistant <{sender_email}>"
-    msg['To'] = receiver_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-    
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
-        server.quit()
-        print(f"📧 [Email] Download link sent to {receiver_email}")
-        return True
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": f"Sahil's Assistant <{sender_email}>",
+                "to": [receiver_email],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=10
+        )
+        
+        if response.status_code in [200, 201]:
+            print(f"📧 [Email] Download link sent to {receiver_email} via Resend")
+            return True
+        else:
+            print(f"❌ [Email] Resend API Error: {response.status_code} - {response.text}")
+            return False
+            
     except Exception as e:
-        print(f"❌ [Email] Failed to send link: {e}")
+        print(f"❌ [Email] HTTP Request failed: {e}")
         return False

@@ -33,6 +33,7 @@ def health():
 def ask():
     data = request.json
     question = data.get('question')
+    mode = data.get('mode', 'auto')
     
     if not question:
         return jsonify({"error": "Question is required"}), 400
@@ -40,9 +41,9 @@ def ask():
     def generate():
         user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         if ',' in user_ip: user_ip = user_ip.split(',')[0].strip()
-        print(f"🌍 [API] Request from IP: {user_ip}")
+        print(f"🌍 [API] Request from IP: {user_ip} | Mode: {mode}")
         
-        for chunk in generate_answer_with_sources(question, user_ip=user_ip):
+        for chunk in generate_answer_with_sources(question, user_ip=user_ip, mode=mode):
             yield json.dumps(chunk) + "\n"
 
     return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
@@ -149,6 +150,7 @@ def ask_sync():
     """Non-streaming endpoint for simpler mobile integration if needed"""
     data = request.json
     question = data.get('question')
+    mode = data.get('mode', 'auto')
     
     if not question:
         return jsonify({"error": "Question is required"}), 400
@@ -159,7 +161,7 @@ def ask_sync():
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if ',' in user_ip: user_ip = user_ip.split(',')[0].strip()
     
-    for chunk in generate_answer_with_sources(question, user_ip=user_ip):
+    for chunk in generate_answer_with_sources(question, user_ip=user_ip, mode=mode):
         if chunk.get("answer_chunk"):
             full_answer += chunk["answer_chunk"]
         if chunk.get("metadata"):
