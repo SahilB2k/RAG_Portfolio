@@ -242,7 +242,8 @@ if 'show_sources' not in st.session_state:
 
 # Header
 st.markdown('<div class="main-header">🤖 AI Resume Assistant</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Powered by RAG | Ask me anything about Sahil Jadhav\'s experience, skills & projects</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header" style="margin-bottom: 0.5rem;">Powered by RAG | Ask me anything about Sahil Jadhav\'s experience, skills & projects</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem; margin-bottom: 2rem;">My brain is slow since I was born just now... Please be patient! 👶</div>', unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
@@ -282,6 +283,81 @@ with st.sidebar:
     for question in sample_questions:
         if st.button(question, key=f"sample_{question}", use_container_width=True):
             st.session_state.current_question = question
+    
+    st.divider()
+    st.header("📄 Resume Download")
+    
+    if 'resume_request_id' not in st.session_state:
+        st.session_state.resume_request_id = None
+        st.session_state.resume_status = "none"
+
+    if st.session_state.resume_status == "none":
+        if st.button("🚀 Request Resume Download", use_container_width=True):
+            with st.spinner("Sending request..."):
+                try:
+                    import uuid
+                    from app.email_service import send_approval_email
+                    req_id = str(uuid.uuid4())
+                    user_ip = "streamlit-web"
+                    user_agent = "Streamlit Browser"
+                    
+                    # Log to DB
+                    from app.db import get_connection
+                    conn = get_connection()
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT INTO resume_requests (id, ip_address, user_agent, status) VALUES (%s, %s, %s, 'pending')",
+                        (req_id, user_ip, user_agent)
+                    )
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+                    
+                    send_approval_email(req_id, user_ip, user_agent)
+                    st.session_state.resume_request_id = req_id
+                    st.session_state.resume_status = "pending"
+                    st.success("Request sent to Sahil!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+    
+    elif st.session_state.resume_status == "pending":
+        st.warning("⏳ Waiting for Sahil's approval...")
+        if st.button("🔄 Check Status", use_container_width=True):
+            try:
+                from app.db import get_connection
+                conn = get_connection()
+                cur = conn.cursor()
+                cur.execute("SELECT status FROM resume_requests WHERE id = %s", (st.session_state.resume_request_id,))
+                result = cur.fetchone()
+                cur.close()
+                conn.close()
+                if result and result[0] == "approved":
+                    st.session_state.resume_status = "approved"
+                    st.success("✅ Download Ready!")
+                    st.rerun()
+                else:
+                    st.info("Still pending...")
+            except Exception as e:
+                st.error(f"Error checking status: {e}")
+                
+    elif st.session_state.resume_status == "approved":
+        st.success("✅ Access Granted!")
+        try:
+            resume_path = Path(__file__).parent.parent / "data" / "resume.md"
+            if (Path(__file__).parent.parent / "data" / "resume.pdf").exists():
+                 resume_path = Path(__file__).parent.parent / "data" / "resume.pdf"
+            
+            with open(resume_path, "rb") as f:
+                st.download_button(
+                    label="⬇️ Download Now",
+                    data=f,
+                    file_name=resume_path.name,
+                    mime="application/octet-stream",
+                    use_container_width=True
+                )
+        except Exception as e:
+            st.error(f"Download error: {e}")
     
     st.divider()
     
