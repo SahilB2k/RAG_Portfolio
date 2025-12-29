@@ -66,9 +66,9 @@ export async function askQuestion(question: string) {
   }
 }
 
-export async function requestResume() {
+export async function requestResume(email: string) {
   try {
-    const response = await axios.post(`${BASE_URL}/request_resume`);
+    const response = await axios.post(`${BASE_URL}/request_resume`, { email });
     return response.data;
   } catch (error) {
     console.error('Request Resume Error:', error);
@@ -76,16 +76,6 @@ export async function requestResume() {
   }
 }
 
-export async function checkRequestStatus(requestId: string) {
-  try {
-    const response = await axios.get(`${BASE_URL}/check_request/${requestId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Check Status Error:', error);
-    throw error;
-  }
-}
-
-export function getDownloadUrl(requestId: string) {
-  return `${BASE_URL}/download_resume/${requestId}`;
+export function getDownloadUrl(token: string) {
+  return `${BASE_URL}/download_resume?token=${token}`;
 }

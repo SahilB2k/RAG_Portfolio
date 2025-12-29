@@ -1,56 +1,35 @@
-import { useState, useEffect } from "react"
-import { StyleSheet, ScrollView, Image, TouchableOpacity, Linking, Alert } from "react-native"
+import { useState } from "react"
+import { StyleSheet, ScrollView, Image, TouchableOpacity, Alert, Modal, TextInput } from "react-native"
 import { Text, View } from "@/components/Themed"
 import Colors from "@/constants/Colors"
 import { useColorScheme } from "react-native"
-import { requestResume, checkRequestStatus, getDownloadUrl } from "@/services/api"
+import { requestResume } from "@/services/api"
 import { Ionicons } from "@expo/vector-icons"
 
 export default function PortfolioScreen() {
   const colorScheme = useColorScheme() ?? "light"
-  const [requestId, setRequestId] = useState<string | null>(null)
-  const [status, setStatus] = useState<"none" | "pending" | "approved">("none")
+  const [email, setEmail] = useState("")
+  const [modalVisible, setModalVisible] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   const handleRequestResume = async () => {
+    if (!email || !email.includes("@")) {
+      Alert.alert("Invalid Email", "Please enter a valid email address to receive the link.")
+      return
+    }
+
     setLoading(true)
     try {
-      const data = await requestResume()
-      setRequestId(data.request_id)
-      setStatus("pending")
-      Alert.alert("Request Sent", "Sahil has been notified. You can download the resume once he approves it.")
+      await requestResume(email)
+      setSuccess(true)
+      setModalVisible(false)
     } catch (error) {
       Alert.alert("Error", "Failed to send request. Is the server running?")
     } finally {
       setLoading(false)
     }
   }
-
-  const handleDownload = () => {
-    if (requestId && status === "approved") {
-      Linking.openURL(getDownloadUrl(requestId))
-    }
-  }
-
-  // Poll for status if pending
-  useEffect(() => {
-    let interval: any
-    if (requestId && status === "pending") {
-      interval = setInterval(async () => {
-        try {
-          const data = await checkRequestStatus(requestId)
-          if (data.status === "approved") {
-            setStatus("approved")
-            clearInterval(interval)
-            Alert.alert("Approved!", "Sahil has approved your request. You can now download the resume.")
-          }
-        } catch (error) {
-          console.error("Polling error:", error)
-        }
-      }, 5000) // Check every 5 seconds
-    }
-    return () => interval && clearInterval(interval)
-  }, [requestId, status])
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: Colors[colorScheme].background }]}>
@@ -65,31 +44,74 @@ export default function PortfolioScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Resume Download</Text>
-        {status === "none" ? (
+        {!success ? (
           <TouchableOpacity
             style={[styles.downloadButton, { backgroundColor: Colors[colorScheme].tint }]}
-            onPress={handleRequestResume}
-            disabled={loading}
+            onPress={() => setModalVisible(true)}
           >
             <Ionicons name="document-text-outline" size={20} color="#fff" />
-            <Text style={styles.buttonText}>{loading ? "Sending Request..." : "Request Resume Download"}</Text>
+            <Text style={styles.buttonText}>Request Resume Link</Text>
           </TouchableOpacity>
-        ) : status === "pending" ? (
-          <View style={styles.statusBox}>
-            <Ionicons name="timer-outline" size={24} color="#f59e0b" />
-            <Text style={styles.statusText}>Request Pending Approval...</Text>
-            <Text style={styles.subStatusText}>Sahil will receive an email to approve this.</Text>
-          </View>
         ) : (
-          <TouchableOpacity
-            style={[styles.downloadButton, { backgroundColor: "#22c55e" }]}
-            onPress={handleDownload}
-          >
-            <Ionicons name="download-outline" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Download Resume Now</Text>
-          </TouchableOpacity>
+          <View style={styles.statusBox}>
+            <Ionicons name="mail-unread-outline" size={24} color="#22c55e" />
+            <Text style={[styles.statusText, { color: "#22c55e" }]}>Email Sent!</Text>
+            <Text style={styles.subStatusText}>Please check your inbox (and spam) for the secure download link.</Text>
+            <TouchableOpacity onPress={() => setSuccess(false)} style={{ marginTop: 10 }}>
+              <Text style={{ color: Colors[colorScheme].tint, fontSize: 12 }}>Send to another email?</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colorScheme === 'dark' ? '#1e293b' : '#fff' }]}>
+            <Text style={styles.modalTitle}>Where should I send the link?</Text>
+            <Text style={styles.modalSub}>Enter your professional email to receive a secure, one-time download link.</Text>
+
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#f8fafc',
+                  color: colorScheme === 'dark' ? '#fff' : '#000',
+                  borderColor: Colors[colorScheme].border
+                }
+              ]}
+              placeholder="recruiter@company.com"
+              placeholderTextColor="#94a3b8"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoFocus={true}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton, { backgroundColor: Colors[colorScheme].tint }]}
+                onPress={handleRequestResume}
+                disabled={loading}
+              >
+                <Text style={styles.confirmText}>{loading ? "Sending..." : "Send Link"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About Me</Text>
@@ -190,14 +212,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "#f59e0b",
+    borderColor: "#22c55e",
     marginTop: 10,
-    backgroundColor: "rgba(245, 158, 11, 0.05)",
+    backgroundColor: "rgba(34, 197, 94, 0.05)",
   },
   statusText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#f59e0b",
     marginTop: 8,
   },
   subStatusText: {
@@ -205,5 +226,64 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     marginTop: 4,
     textAlign: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 20,
+    padding: 25,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  modalSub: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  input: {
+    height: 50,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: 'transparent',
+  },
+  confirmButton: {
+    shadowColor: "#6366f1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  cancelText: {
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  confirmText: {
+    fontWeight: '700',
+    color: '#fff',
   },
 })

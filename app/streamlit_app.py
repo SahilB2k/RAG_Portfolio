@@ -285,79 +285,53 @@ with st.sidebar:
             st.session_state.current_question = question
     
     st.divider()
-    st.header("📄 Resume Download")
+    st.sidebar.header("📄 Resume Download")
     
-    if 'resume_request_id' not in st.session_state:
-        st.session_state.resume_request_id = None
-        st.session_state.resume_status = "none"
+    if 'resume_success' not in st.session_state:
+        st.session_state.resume_success = False
 
-    if st.session_state.resume_status == "none":
-        if st.button("🚀 Request Resume Download", use_container_width=True):
-            with st.spinner("Sending request..."):
+    if not st.session_state.resume_success:
+        email_inp = st.sidebar.text_input("Recruiter Email:", placeholder="recruiter@company.com", key="resume_email_input")
+        if st.sidebar.button("Send Download Link", use_container_width=True):
+            if email_inp and "@" in email_inp:
                 try:
                     import uuid
-                    from app.email_service import send_approval_email
-                    req_id = str(uuid.uuid4())
-                    user_ip = "streamlit-web"
-                    user_agent = "Streamlit Browser"
-                    
-                    # Log to DB
+                    import hashlib
+                    import threading
+                    from datetime import datetime, timedelta
                     from app.db import get_connection
+                    from app.email_service import send_resume_link_email
+                    
+                    token = str(uuid.uuid4())
+                    expires_at = datetime.now() + timedelta(minutes=10)
+                    hashed_ip = hashlib.sha256("streamlit_user".encode()).hexdigest()
+                    
                     conn = get_connection()
                     cur = conn.cursor()
                     cur.execute(
-                        "INSERT INTO resume_requests (id, ip_address, user_agent, status) VALUES (%s, %s, %s, 'pending')",
-                        (req_id, user_ip, user_agent)
+                        """INSERT INTO resume_requests (email, token, status, expires_at, hashed_ip) 
+                           VALUES (%s, %s, 'pending', %s, %s)""",
+                        (email_inp, token, expires_at, hashed_ip)
                     )
                     conn.commit()
                     cur.close()
                     conn.close()
                     
-                    send_approval_email(req_id, user_ip, user_agent)
-                    st.session_state.resume_request_id = req_id
-                    st.session_state.resume_status = "pending"
-                    st.success("Request sent to Sahil!")
+                    thread = threading.Thread(target=send_resume_link_email, args=(email_inp, token))
+                    thread.start()
+                    
+                    st.session_state.resume_success = True
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error: {e}")
-    
-    elif st.session_state.resume_status == "pending":
-        st.warning("⏳ Waiting for Sahil's approval...")
-        if st.button("🔄 Check Status", use_container_width=True):
-            try:
-                from app.db import get_connection
-                conn = get_connection()
-                cur = conn.cursor()
-                cur.execute("SELECT status FROM resume_requests WHERE id = %s", (st.session_state.resume_request_id,))
-                result = cur.fetchone()
-                cur.close()
-                conn.close()
-                if result and result[0] == "approved":
-                    st.session_state.resume_status = "approved"
-                    st.success("✅ Download Ready!")
-                    st.rerun()
-                else:
-                    st.info("Still pending...")
-            except Exception as e:
-                st.error(f"Error checking status: {e}")
-                
-    elif st.session_state.resume_status == "approved":
-        st.success("✅ Access Granted!")
-        try:
-            resume_path = Path(__file__).parent.parent / "data" / "resume.md"
-            if (Path(__file__).parent.parent / "data" / "resume.pdf").exists():
-                 resume_path = Path(__file__).parent.parent / "data" / "resume.pdf"
-            
-            with open(resume_path, "rb") as f:
-                st.download_button(
-                    label="⬇️ Download Now",
-                    data=f,
-                    file_name=resume_path.name,
-                    mime="application/octet-stream",
-                    use_container_width=True
-                )
-        except Exception as e:
-            st.error(f"Download error: {e}")
+                    st.sidebar.error(f"Error: {e}")
+            else:
+                st.sidebar.error("Valid email required!")
+    else:
+        st.sidebar.success("✅ Download Link Sent!")
+        st.sidebar.info("Please check your email inbox (and spam folder) for Sahil's resume link. It expires in 10 minutes.")
+        if st.sidebar.button("Send to another email?"):
+            st.session_state.resume_success = False
+            st.rerun()
     
     st.divider()
     

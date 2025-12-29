@@ -4,54 +4,45 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-def send_approval_email(request_id, ip_address, user_agent):
-    """Sends an approval request email to Sahil"""
-    sender_email = os.getenv("SENDER_EMAIL") # e.g., your-email@gmail.com
-    sender_password = os.getenv("SENDER_PASSWORD") # Gmail App Password
-    receiver_email = "jadhavssahil@gmail.com"
+def send_resume_link_email(receiver_email, token):
+    """Sends a time-limited download link directly to the recruiter"""
+    sender_email = os.getenv("SENDER_EMAIL")
+    sender_password = os.getenv("SENDER_PASSWORD")
     
-    # You'll need to update this BASE_URL based on your Render deployment
+    # Direct link for the browser
     base_url = "https://rag-portfolio-mvjo.onrender.com"
-    approve_url = f"{base_url}/approve_resume/{request_id}"
+    download_url = f"{base_url}/download_resume?token={token}"
     
-    subject = "📄 Resume Download Request - Sahil's Digital Twin"
-    
-    # Use datetime instead of os.popen(date /t) for cross-platform compatibility
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    subject = "📄 Resume Download Link - Sahil Jadhav"
     
     body = f"""
-    Hello Sahil,
+    Hello,
     
-    Someone is requesting to download your resume via the RAG Portfolio app.
+    Thank you for your interest in Sahil Jadhav's profile! 
     
-    Requester Details:
-    - IP Address: {ip_address}
-    - User Agent: {user_agent}
-    - Timestamp: {timestamp}
+    You can download his resume using the secure link below. 
+    Note: This link is valid for one-time use and will expire in 10 minutes.
     
-    If you want to allow this download, click the link below:
-    {approve_url}
+    Download Link:
+    {download_url}
     
     Best regards,
-    Your Digital Twin
+    Sahil Jadhav's Digital Assistant
     """
     
     msg = MIMEMultipart()
-    msg['From'] = sender_email
+    msg['From'] = f"Sahil's Assistant <{sender_email}>"
     msg['To'] = receiver_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
     
     try:
-        # Added timeout to prevent hanging the API
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
-        server.starttls()
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
         server.login(sender_email, sender_password)
-        text = msg.as_string()
-        server.sendmail(sender_email, receiver_email, text)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
         server.quit()
-        print(f"📧 [Email] Approval request sent for {request_id}")
+        print(f"📧 [Email] Download link sent to {receiver_email}")
         return True
     except Exception as e:
-        print(f"❌ [Email] Failed to send email: {e}")
+        print(f"❌ [Email] Failed to send link: {e}")
         return False
