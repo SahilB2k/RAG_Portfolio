@@ -40,7 +40,7 @@ def generate_with_groq(prompt):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.2-3b-preview", # or llama-3.1-70b-versatile
+        "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
         "max_tokens": 500,
@@ -48,6 +48,8 @@ def generate_with_groq(prompt):
     }
     
     response = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
+    if response.status_code != 200:
+        print(f"❌ [Groq] Error {response.status_code}: {response.text}")
     response.raise_for_status()
     
     for line in response.iter_lines():
@@ -71,6 +73,7 @@ def generate_with_gemini(prompt):
     if not api_key:
         raise ValueError("Missing Gemini API Key")
     
+    # Fixed URL: models/ prefix is required for the specific model path
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -82,6 +85,8 @@ def generate_with_gemini(prompt):
     }
     
     response = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
+    if response.status_code != 200:
+        print(f"❌ [Gemini] Error {response.status_code}: {response.text}")
     response.raise_for_status()
     
     for line in response.iter_lines():
@@ -118,8 +123,9 @@ def generate_answer_with_sources(question: str, user_ip: str = "unknown"):
     RAG generator with multi-provider fallback strategy: Groq -> Gemini -> Ollama
     """
     print(f"\n🔍 [RAG] Processing Question: {question}")
+    # Search for top 6 (balanced for cloud LLM context window)
     retrieved_chunks = hybrid_search(question, top_k=6)
-    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.22]
+    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.15] # Lowered slightly for more recall
     
     if not relevant_chunks:
         yield {"answer_chunk": "I couldn't find specific information in Sahil's resume to answer that precisely.", "metadata": None}
