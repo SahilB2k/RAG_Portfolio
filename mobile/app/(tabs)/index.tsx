@@ -30,6 +30,7 @@ interface Message {
 
 export default function ChatScreen() {
   const [input, setInput] = useState("")
+  const [mode, setMode] = useState<"auto" | "casual" | "recruiter">("auto")
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -78,6 +79,7 @@ export default function ChatScreen() {
         (metadata) => {
           setMessages((prev) => prev.map((msg) => (msg.id === aiMsgId ? { ...msg, metadata } : msg)))
         },
+        mode
       )
     } catch (error) {
       setMessages((prev) =>
@@ -124,7 +126,7 @@ export default function ChatScreen() {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={[styles.container, { backgroundColor: Colors[colorScheme].background }]}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
     >
       <FlatList
         ref={flatListRef}
@@ -136,49 +138,68 @@ export default function ChatScreen() {
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
-      {loading && (
-        <Animated.View style={[styles.typingContainer, { opacity: fadeAnim }]}>
-          <Text style={styles.typingText}>Sahil is typing...</Text>
-        </Animated.View>
-      )}
+      <View style={styles.bottomControls}>
+        <View style={styles.modeContainer}>
+          {(["auto", "casual", "recruiter"] as const).map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[
+                styles.modeChip,
+                mode === m && { backgroundColor: Colors[colorScheme].tint, borderColor: Colors[colorScheme].tint }
+              ]}
+              onPress={() => setMode(m)}
+            >
+              <Text style={[styles.modeText, mode === m && { color: "#fff" }]}>
+                {m.charAt(0).toUpperCase() + m.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <View style={styles.disclaimerContainer}>
-        <Text style={styles.disclaimerText}>
-          My brain is slow since I was born just now... Please be patient! 👶
-        </Text>
-      </View>
+        {loading && (
+          <Animated.View style={[styles.typingContainer, { opacity: fadeAnim }]}>
+            <Text style={styles.typingText}>Sahil is typing...</Text>
+          </Animated.View>
+        )}
 
-      <View
-        style={[
-          styles.inputArea,
-          { borderTopColor: Colors[colorScheme].border, backgroundColor: Colors[colorScheme].background },
-        ]}
-      >
-        <TextInput
+        <View style={styles.disclaimerContainer}>
+          <Text style={styles.disclaimerText}>
+            My brain is slow since I was born just now... Please be patient! 👶
+          </Text>
+        </View>
+
+        <View
           style={[
-            styles.input,
-            {
-              backgroundColor: colorScheme === "dark" ? "#1e293b" : "#f1f5f9",
-              color: Colors[colorScheme].text,
-            },
+            styles.inputArea,
+            { borderTopColor: Colors[colorScheme].border, backgroundColor: Colors[colorScheme].background },
           ]}
-          placeholder="Message Sahil..."
-          placeholderTextColor={colorScheme === "dark" ? "#94a3b8" : "#64748b"}
-          value={input}
-          onChangeText={setInput}
-          multiline
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            { backgroundColor: Colors[colorScheme].tint },
-            (!input.trim() || loading) && styles.sendButtonDisabled,
-          ]}
-          onPress={handleSend}
-          disabled={!input.trim() || loading}
         >
-          <Ionicons name="arrow-up" size={24} color="#fff" />
-        </TouchableOpacity>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colorScheme === "dark" ? "#1e293b" : "#f1f5f9",
+                color: Colors[colorScheme].text,
+              },
+            ]}
+            placeholder="Message Sahil..."
+            placeholderTextColor={colorScheme === "dark" ? "#94a3b8" : "#64748b"}
+            value={input}
+            onChangeText={setInput}
+            multiline
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              { backgroundColor: Colors[colorScheme].tint },
+              (!input.trim() || loading) && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!input.trim() || loading}
+          >
+            <Ionicons name="arrow-up" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   )
@@ -286,5 +307,28 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     fontStyle: "italic",
     textAlign: "center",
+  },
+  bottomControls: {
+    paddingBottom: Platform.OS === "ios" ? 10 : 0,
+  },
+  modeContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    backgroundColor: "transparent",
+  },
+  modeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#94a3b8",
+    backgroundColor: "transparent",
+  },
+  modeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#94a3b8",
   },
 })

@@ -9,6 +9,7 @@ export function askStreamingQuestion(
   question: string,
   onChunk: (chunk: string) => void,
   onMetadata?: (metadata: any) => void,
+  mode: string = 'auto',
 ) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -50,14 +51,15 @@ export function askStreamingQuestion(
     };
 
     xhr.onerror = () => reject(new Error('Network error'));
-    xhr.send(JSON.stringify({ question }));
+    xhr.send(JSON.stringify({ question, mode }));
   });
 }
 
-export async function askQuestion(question: string) {
+export async function askQuestion(question: string, mode: string = 'auto') {
   try {
     const response = await axios.post(`${BASE_URL}/ask_sync`, {
       question: question,
+      mode: mode,
     });
     return response.data;
   } catch (error) {
