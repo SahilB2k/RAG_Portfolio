@@ -14,6 +14,7 @@ from app.db import get_connection
 
 def log_query(question: str, provider: str, confidence: str, user_ip: str = "unknown"):
     """Saves the user query metadata to Supabase for observability"""
+    conn = None
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -23,10 +24,12 @@ def log_query(question: str, provider: str, confidence: str, user_ip: str = "unk
         )
         conn.commit()
         cur.close()
-        conn.close()
         print(f"📝 [Log] Query recorded in Supabase (Provider: {provider})")
     except Exception as e:
         print(f"⚠️ [Log] Failed to log query: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def generate_with_groq(prompt):
     """Primary provider: Groq (Llama 3.2 70B or 3B)"""
@@ -43,7 +46,7 @@ def generate_with_groq(prompt):
         "model": "llama-3.1-8b-instant",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
-        "max_tokens": 500,
+        "max_tokens": 800, # Increased for detailed project descriptions
         "stream": True
     }
     
@@ -54,17 +57,18 @@ def generate_with_groq(prompt):
     
     for line in response.iter_lines():
         if line:
-            line_text = line.decode('utf-8')
-            if line_text.startswith("data: "):
-                data = line_text[6:]
-                if data == "[DONE]":
+            # Robust SSE parsing
+            line_text = line.decode('utf-8').strip()
+            if line_text.startswith("data:"):
+                data_str = line_text[5:].strip()
+                if data_str == "[DONE]":
                     break
                 try:
-                    chunk = json.loads(data)
+                    chunk = json.loads(data_str)
                     content = chunk['choices'][0]['delta'].get('content', "")
                     if content:
                         yield content
-                except:
+                except json.JSONDecodeError:
                     continue
 
 def generate_with_gemini(prompt):
@@ -73,14 +77,13 @@ def generate_with_gemini(prompt):
     if not api_key:
         raise ValueError("Missing Gemini API Key")
     
-    # Fixed URL: models/ prefix is required for the specific model path
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 500
+            "maxOutputTokens": 800
         }
     }
     
@@ -91,10 +94,15 @@ def generate_with_gemini(prompt):
     
     for line in response.iter_lines():
         if line:
-            chunk = json.loads(line.decode('utf-8'))
-            if 'candidates' in chunk and len(chunk['candidates']) > 0:
-                text = chunk['candidates'][0]['content']['parts'][0]['text']
-                yield text
+            try:
+                chunk = json.loads(line.decode('utf-8'))
+                # Safety check: ensure candidates and content exist
+                if chunk.get('candidates') and chunk['candidates'][0].get('content'):
+                    parts = chunk['candidates'][0]['content'].get('parts', [])
+                    if parts:
+                        yield parts[0]['text']
+            except (KeyError, IndexError, json.JSONDecodeError):
+                continue
 
 def generate_with_ollama(prompt):
     """Local fallback / Development provider: Ollama"""
@@ -104,140 +112,128 @@ def generate_with_ollama(prompt):
         "model": "llama3.2",
         "prompt": prompt,
         "stream": True,
-        "options": {"num_ctx": 1024, "temperature": 0.2}
+        "options": {"num_ctx": 2048, "temperature": 0.2} # Increased context window
     }
     headers = {"ngrok-skip-browser-warning": "any"}
     
-    response = requests.post(url, json=payload, headers=headers, stream=True, timeout=10)
-    response.raise_for_status()
-    
-    for line in response.iter_lines():
-        if line:
-            chunk = json.loads(line)
-            yield chunk.get("response", "")
-            if chunk.get("done"):
-                break
+    try:
+        response = requests.post(url, json=payload, headers=headers, stream=True, timeout=10)
+        response.raise_for_status()
+        
+        for line in response.iter_lines():
+            if line:
+                chunk = json.loads(line)
+                yield chunk.get("response", "")
+                if chunk.get("done"):
+                    break
+    except Exception as e:
+        print(f"❌ [Ollama] Connection failed: {e}")
+        raise e
 
 def is_greeting_or_casual(question: str) -> bool:
-    """Detect if the query is a greeting or casual conversation"""
+    """
+    Detect if the query is strictly a greeting. 
+    If it contains substantive keywords (resume, project, skills), return False.
+    """
+    cleaned_q = question.lower().strip()
+    
+    # If the user asks about specific topics, it is NOT just a greeting
+    substantive_keywords = ["resume", "project", "work", "job", "skill", "experience", "education", "hired", "contact", "detail"]
+    if any(kw in cleaned_q for kw in substantive_keywords):
+        return False
+        
     casual_patterns = [
         "hello", "hi", "hey", "greetings", "good morning", "good evening", 
-        "how are you", "what's up", "whats up", "sup", "yo",
-        "thanks", "thank you", "bye", "goodbye", "see you"
+        "how are you", "what's up", "yo", "thanks", "thank you", "bye"
     ]
-    return any(pattern in question.lower().strip() for pattern in casual_patterns)
+    
+    # Exact match or very short greeting
+    if cleaned_q in casual_patterns:
+        return True
+    
+    # If it's a short sentence starting with a greeting but no substantive keywords
+    if len(cleaned_q.split()) < 4 and any(cleaned_q.startswith(p) for p in casual_patterns):
+        return True
+        
+    return False
 
 def generate_answer_with_sources(question: str, user_ip: str = "unknown", mode: str = "auto"):
     """
-    RAG generator with multi-provider fallback strategy: Groq -> Gemini -> Ollama
-    Supports 'Recruiter', 'Casual', and 'Auto' modes.
+    RAG generator with multi-provider fallback strategy.
     """
     print(f"\n🔍 [RAG] Processing Question: {question} (Mode: {mode})")
     
-    # Handle greetings and casual conversation without RAG
+    # 1. Handle Greetings
     if is_greeting_or_casual(question):
-        greeting_prompt = f"""You are Sahil's professional resume chatbot. A user just said: "{question}"
-
-Respond briefly and professionally, then guide them to ask about Sahil's resume.
-Keep your response under 20 words.
-
-Examples:
-- User: "Hello" → "Hello! I'm here to answer questions about Sahil's professional background. What would you like to know?"
-- User: "Hi" → "Hi! Feel free to ask me about Sahil's experience, skills, or projects."
-- User: "Thanks" → "You're welcome! Let me know if you have any other questions about Sahil's background."
-
-Now respond to: "{question}"
-"""
-        
-        providers = [
-            ("Groq", generate_with_groq),
-            ("Gemini", generate_with_gemini),
-            ("Ollama", generate_with_ollama)
-        ]
-        
-        for name, func in providers:
-            try:
-                for text_chunk in func(greeting_prompt):
-                    yield {"answer_chunk": text_chunk, "metadata": None}
-                log_query(question, name, "greeting", user_ip)
-                return
-            except Exception as e:
-                print(f"⚠️ [RAG] {name} failed: {e}")
-                continue
-        
-        # Fallback if all providers fail
-        yield {"answer_chunk": "Hello! I'm Sahil's resume assistant. Please ask me about his experience, skills, or projects.", "metadata": None}
+        yield {"answer_chunk": "Hello! I am Sahil's AI assistant. I can answer detailed questions about his projects, experience, and skills. What would you like to know?", "metadata": None}
         return
+
+    # 2. Determine Style
+    recruiter_keywords = ["experience", "skills", "resume", "projects", "hire", "role", "internship", "work", "education", "tech stack"]
     
-    # Auto-detection logic if mode is 'auto'
-    recruiter_keywords = ["experience", "skills", "resume", "projects", "hire", "role", "internship", "work", "education"]
     if mode == "auto":
-        if any(kw in question.lower() for kw in recruiter_keywords):
-            detected_mode = "recruiter"
-        else:
-            detected_mode = "casual"
+        detected_mode = "recruiter" if any(kw in question.lower() for kw in recruiter_keywords) else "casual"
     else:
         detected_mode = mode.lower()
 
-    # Search for top 6
-    retrieved_chunks = hybrid_search(question, top_k=6)
-    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.15]
+    # 3. Retrieve Context
+    # Increased top_k to ensure we capture multiple projects if asked
+    retrieved_chunks = hybrid_search(question, top_k=7) 
+    
+    # Lowered threshold slightly to avoid missing context on specific queries
+    relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.12] 
     
     if not relevant_chunks:
-        yield {"answer_chunk": "I couldn't find specific information in Sahil's resume to answer that question. Could you rephrase or ask about his experience, skills, or projects?", "metadata": None}
+        yield {"answer_chunk": "I checked Sahil's resume, but I couldn't find specific details regarding that. However, I can tell you about his main projects and technical skills. Would you like to hear about those?", "metadata": None}
         return
 
-    top_chunks = relevant_chunks[:5]
+    top_chunks = relevant_chunks[:6]
     context_text = "\n---\n".join([c[0] for c in top_chunks])
     
-    # Sources metadata
+    # Build Metadata
     sources = []
     for content, score, search_type in top_chunks:
-        section = content.split(":")[0] if ":" in content and len(content.split(":")[0]) < 50 else "Resume Section"
+        section = content.split(":")[0] if ":" in content and len(content.split(":")[0]) < 50 else "Resume Detail"
         sources.append({
             "section": section,
             "relevance": f"{int(score * 100)}%" if search_type == 'vector' else "100%",
-            "preview": content[:120].strip() + "..."
+            "preview": content[:100].strip() + "..."
         })
 
     avg_score = sum(rc[1] for rc in top_chunks if rc[2] == 'vector') / len([rc for rc in top_chunks if rc[2] == 'vector']) if [rc for rc in top_chunks if rc[2] == 'vector'] else 0
-    confidence = "high" if (any(rc[2] == 'keyword' for rc in top_chunks) or avg_score > 0.5) else "medium" if avg_score > 0.3 else "low"
+    confidence = "high" if avg_score > 0.45 else "medium"
 
-    # Style Instructions based on detected mode
+    # 4. Construct System Prompt (FIXED FOR PROFESSIONALISM)
     if detected_mode == "recruiter":
-        style_instruction = (
-            "You are a professional resume assistant representing Sahil. "
-            "Answer in a direct, professional, and concise manner suitable for recruiters or hiring managers. "
-            "Use bullet points for lists. Highlight metrics, technical skills, project outcomes, and professional accomplishments. "
-            "Format key information with **bold** text. "
-            "If relevant links (GitHub, LinkedIn, Portfolio) are found in the context, include them. "
-            "Do NOT add pleasantries or casual language. Focus purely on factual, career-relevant information."
+        tone_instruction = (
+            "You are a professional hiring assistant. Answer with high information density. "
+            "Use bullet points for projects and metrics. "
+            "Do NOT use filler words. Focus on technologies, outcomes, and specific contributions."
         )
-    else:  # casual
-        style_instruction = (
-            "You are Sahil's friendly resume assistant. "
-            "Answer in a conversational yet informative tone. Keep responses clear and helpful. "
-            "Use **bold** for important points. Stay focused on resume-related information. "
-            "Be warm but professional - this is still a professional context."
+    else:
+        tone_instruction = (
+            "You are a helpful and professional assistant. Answer naturally but stay focused on Sahil's professional achievements. "
+            "Use clear, easy-to-read formatting."
         )
 
-    prompt = f"""You are an AI assistant specifically designed to answer questions about Sahil's professional resume and background.
+    prompt = f"""You are an AI assistant answering questions about Sahil based ONLY on his resume.
 
-CRITICAL INSTRUCTIONS:
-1. ONLY answer questions related to Sahil's professional background, skills, experience, education, or projects
-2. Base your answers STRICTLY on the provided resume context below
-3. If the question cannot be answered from the resume context, say so clearly
-4. Do NOT make up information or assume details not present in the context
-5. Do NOT respond to personal questions unrelated to the resume
-6. {style_instruction}
-
-Resume Context:
+CONTEXT FROM RESUME:
 {context_text}
 
-Question: {question}
+USER QUESTION:
+{question}
 
-Answer based solely on the above resume context:"""
+CRITICAL RULES:
+1. **Direct Answer:** You must extract the answer from the context.
+2. **Never Deflect:** NEVER say "You can check the resume" or "It is detailed in the resume." YOU are the resume reader.
+3. **Completeness:** If the user asks about projects, list the specific projects found in the context, including the tech stack used for each.
+4. **Honesty:** If the specific detail isn't there, say "The resume doesn't mention that specific detail, but..." and pivot to what IS known.
+5. {tone_instruction}
 
+Start your answer immediately:"""
+
+    # 5. Call Providers
     providers = [
         ("Groq", generate_with_groq),
         ("Gemini", generate_with_gemini),
@@ -246,12 +242,12 @@ Answer based solely on the above resume context:"""
 
     success = False
     for name, func in providers:
-        print(f"🤖 [RAG] Attempting style: {detected_mode} with {name}...")
+        print(f"🤖 [RAG] Attempting generation with {name}...")
         try:
             for text_chunk in func(prompt):
                 yield {"answer_chunk": text_chunk, "metadata": None}
+            
             success = True
-            # Log the successful query
             log_query(question, name, confidence, user_ip)
             break
         except Exception as e:
@@ -259,14 +255,14 @@ Answer based solely on the above resume context:"""
             continue
 
     if not success:
-        yield {"answer_chunk": "❌ All AI providers are currently unavailable. Please try again later.", "metadata": None}
+        yield {"answer_chunk": "❌ Service is currently experiencing high load. Please try asking again in a moment.", "metadata": None}
     else:
         yield {
             "answer_chunk": "", 
             "metadata": {
                 "sources": sources,
                 "confidence": confidence,
-                "total_chunks": len(sources)
+                "mode": detected_mode
             }
         }
     print(f"✨ [RAG] Generation complete.")
