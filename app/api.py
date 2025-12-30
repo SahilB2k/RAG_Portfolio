@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, Response, stream_with_context, send_from_directory
+from datetime import datetime, timedelta
 from flask_cors import CORS
 from app.rag_answer import generate_answer_with_sources
 from app.db import get_connection
@@ -7,7 +8,7 @@ import uuid
 import os
 import threading
 from app.config import get_config
-from datetime import datetime, timedelta
+
 import hashlib
 from app.email_service import send_download_alert
 
@@ -28,7 +29,9 @@ def get_platform_from_ua(ua):
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "unhealthy" if not config.DATABASE_URL else "healthy", "env": config.APP_ENV}), 200
+    return jsonify({"status": "healthy" if config.DATABASE_URL else "unhealthy"}), 200
+
+
 
 @app.route('/ask', methods=['POST'])
 def ask():
@@ -236,48 +239,50 @@ def ask_sync():
         "metadata": metadata
     })
 
-from datetime import datetime, timedelta # Ensure these are imported at the top
+
+
 
 @app.route('/log_download', methods=['POST'])
 def log_download():
+    """Logs download and sends email alert asynchronously"""
     data = request.json
     email = data.get('email', 'Anonymous')
     source_ref = data.get('source_ref', 'Direct/Organic')
     
+    # Metadata collection
     user_agent = request.headers.get('User-Agent', 'Unknown')
     platform = get_platform_from_ua(user_agent)
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if user_ip and ',' in user_ip: user_ip = user_ip.split(',')[0].strip()
     hashed_ip = hashlib.sha256(user_ip.encode()).hexdigest()
     
-    # 1. Generate required fields to satisfy DB constraints
+    # Satisfying DB Constraints
     real_uuid = str(uuid.uuid4())
-    # Set expiration to 100 years from now so it never "expires" for your logs
-    future_expiry = datetime.now() + timedelta(days=365 * 100)
+    future_expiry = datetime.now() + timedelta(days=365 * 100) # Prevents null error
 
     try:
+        # 1. Save to Database
         conn = get_connection()
         cur = conn.cursor()
-        
-        # 2. Updated INSERT with expires_at
         cur.execute(
             """INSERT INTO resume_requests 
                (email, token, status, hashed_ip, user_agent, platform, expires_at) 
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-            (
-                email, 
-                real_uuid, 
-                f"downloaded via {source_ref}", 
-                hashed_ip, 
-                user_agent, 
-                platform,
-                future_expiry # <--- This fixes the Not-Null constraint
-            )
+            (email, real_uuid, f"Downloaded ({source_ref})", hashed_ip, user_agent, platform, future_expiry)
         )
         conn.commit()
         cur.close()
         conn.close()
+
+        # 2. Send Email Alert in Background
+        # We use threading so the recruiter doesn't have to wait for the email API to finish
+        email_thread = threading.Thread(
+            target=send_download_alert, 
+            args=(email, f"Instant Download ({source_ref})", f"Platform: {platform} | IP: {user_ip}")
+        )
+        email_thread.start()
         
-        return jsonify({"status": "success"}), 200
+        return jsonify({"status": "success", "message": "Log recorded and alert triggered"}), 200
     except Exception as e:
         print(f"❌ [API] Log Error: {e}")
         return jsonify({"error": str(e)}), 500
