@@ -98,37 +98,51 @@ st.markdown("""
 # =============================================================================
 @st.dialog("Access Resume")
 def download_dialog():
-    st.markdown(f"**Targeting Source:** `{source_ref}`")
-    st.write("Please enter your email to unlock the PDF.")
-    
-    with st.form("quick_download"):
-        email = st.text_input("Work Email (Optional)", placeholder="recruiter@company.com")
-        submit = st.form_submit_button("Submit & Unlock", use_container_width=True)
-        
-        if submit:
-            # Send lead info to your Flask API backend
-            try:
-                # Replace with your Render/Production API URL
-                backend_api = "https://your-api-url.onrender.com/log_download" 
-                requests.post(backend_api, json={
-                    "email": email if email else f"Anonymous_{source_ref}",
-                    "source_ref": source_ref
-                }, timeout=5)
-            except:
-                pass # Silently fail if API is down to not block user
+    # Initialize a state to track if the form was submitted successfully
+    if "download_unlocked" not in st.session_state:
+        st.session_state.download_unlocked = False
 
-            st.success("Download Unlocked!")
-            try:
-                with open("assets/Sahil_Jadhav_Resume.pdf", "rb") as f:
-                    st.download_button(
-                        label="📥 Click to Download PDF",
-                        data=f,
-                        file_name="Sahil_Jadhav_Resume.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-            except FileNotFoundError:
-                st.error("Resume file not found in /assets")
+    # STEP 1: If not unlocked, show the form
+    if not st.session_state.download_unlocked:
+        st.write("Please provide your email to unlock the download.")
+        with st.form("quick_download"):
+            email = st.text_input("Work Email (Optional)", placeholder="recruiter@company.com")
+            submit = st.form_submit_button("Unlock PDF", use_container_width=True)
+            
+            if submit:
+                # Log the lead to your backend
+                try:
+                    backend_api = "https://rag-portfolio-mvjo.onrender.com/log_download" 
+                    requests.post(backend_api, json={
+                        "email": email if email else f"Anonymous_{source_ref}",
+                        "source_ref": source_ref
+                    }, timeout=5)
+                except:
+                    pass
+                
+                # Unlock the download and rerun to refresh the dialog UI
+                st.session_state.download_unlocked = True
+                st.rerun()
+
+    # STEP 2: If unlocked, hide the form and show the actual download button
+    else:
+        st.success("✅ Access Granted!")
+        try:
+            with open("assets/Sahil_Jadhav_Resume.pdf", "rb") as f:
+                st.download_button(
+                    label="📥 Click to Download PDF Now",
+                    data=f,
+                    file_name="Sahil_Jadhav_Resume.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+        except FileNotFoundError:
+            st.error("Resume file not found in /assets")
+        
+        # Option to go back/reset
+        if st.button("Cancel / Reset", type="secondary"):
+            st.session_state.download_unlocked = False
+            st.rerun()
 
 # =============================================================================
 # ⚙️ SIDEBAR
