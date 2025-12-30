@@ -236,11 +236,12 @@ def ask_sync():
         "metadata": metadata
     })
 
+from datetime import datetime, timedelta # Ensure these are imported at the top
+
 @app.route('/log_download', methods=['POST'])
 def log_download():
     data = request.json
     email = data.get('email', 'Anonymous')
-    # Use the ref as part of a message or status
     source_ref = data.get('source_ref', 'Direct/Organic')
     
     user_agent = request.headers.get('User-Agent', 'Unknown')
@@ -248,26 +249,28 @@ def log_download():
     user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     hashed_ip = hashlib.sha256(user_ip.encode()).hexdigest()
     
-    # GENERATE A REAL UUID to satisfy the database constraint
+    # 1. Generate required fields to satisfy DB constraints
     real_uuid = str(uuid.uuid4())
+    # Set expiration to 100 years from now so it never "expires" for your logs
+    future_expiry = datetime.now() + timedelta(days=365 * 100)
 
     try:
         conn = get_connection()
         cur = conn.cursor()
         
-        # We store the 'REF' info in the email or status field instead
-        # to avoid the UUID type error
+        # 2. Updated INSERT with expires_at
         cur.execute(
             """INSERT INTO resume_requests 
-               (email, token, status, hashed_ip, user_agent, platform) 
-               VALUES (%s, %s, %s, %s, %s, %s)""",
+               (email, token, status, hashed_ip, user_agent, platform, expires_at) 
+               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             (
                 email, 
-                real_uuid,                   # Correct UUID format
-                f"downloaded via {source_ref}", # Tracking info here
+                real_uuid, 
+                f"downloaded via {source_ref}", 
                 hashed_ip, 
                 user_agent, 
-                platform
+                platform,
+                future_expiry # <--- This fixes the Not-Null constraint
             )
         )
         conn.commit()
