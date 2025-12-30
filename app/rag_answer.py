@@ -118,12 +118,56 @@ def generate_with_ollama(prompt):
             if chunk.get("done"):
                 break
 
+def is_greeting_or_casual(question: str) -> bool:
+    """Detect if the query is a greeting or casual conversation"""
+    casual_patterns = [
+        "hello", "hi", "hey", "greetings", "good morning", "good evening", 
+        "how are you", "what's up", "whats up", "sup", "yo",
+        "thanks", "thank you", "bye", "goodbye", "see you"
+    ]
+    return any(pattern in question.lower().strip() for pattern in casual_patterns)
+
 def generate_answer_with_sources(question: str, user_ip: str = "unknown", mode: str = "auto"):
     """
     RAG generator with multi-provider fallback strategy: Groq -> Gemini -> Ollama
     Supports 'Recruiter', 'Casual', and 'Auto' modes.
     """
     print(f"\n🔍 [RAG] Processing Question: {question} (Mode: {mode})")
+    
+    # Handle greetings and casual conversation without RAG
+    if is_greeting_or_casual(question):
+        greeting_prompt = f"""You are Sahil's professional resume chatbot. A user just said: "{question}"
+
+Respond briefly and professionally, then guide them to ask about Sahil's resume.
+Keep your response under 20 words.
+
+Examples:
+- User: "Hello" → "Hello! I'm here to answer questions about Sahil's professional background. What would you like to know?"
+- User: "Hi" → "Hi! Feel free to ask me about Sahil's experience, skills, or projects."
+- User: "Thanks" → "You're welcome! Let me know if you have any other questions about Sahil's background."
+
+Now respond to: "{question}"
+"""
+        
+        providers = [
+            ("Groq", generate_with_groq),
+            ("Gemini", generate_with_gemini),
+            ("Ollama", generate_with_ollama)
+        ]
+        
+        for name, func in providers:
+            try:
+                for text_chunk in func(greeting_prompt):
+                    yield {"answer_chunk": text_chunk, "metadata": None}
+                log_query(question, name, "greeting", user_ip)
+                return
+            except Exception as e:
+                print(f"⚠️ [RAG] {name} failed: {e}")
+                continue
+        
+        # Fallback if all providers fail
+        yield {"answer_chunk": "Hello! I'm Sahil's resume assistant. Please ask me about his experience, skills, or projects.", "metadata": None}
+        return
     
     # Auto-detection logic if mode is 'auto'
     recruiter_keywords = ["experience", "skills", "resume", "projects", "hire", "role", "internship", "work", "education"]
@@ -140,7 +184,7 @@ def generate_answer_with_sources(question: str, user_ip: str = "unknown", mode: 
     relevant_chunks = [c for c in retrieved_chunks if c[1] > 0.15]
     
     if not relevant_chunks:
-        yield {"answer_chunk": "I couldn't find specific information in Sahil's resume to answer that precisely.", "metadata": None}
+        yield {"answer_chunk": "I couldn't find specific information in Sahil's resume to answer that question. Could you rephrase or ask about his experience, skills, or projects?", "metadata": None}
         return
 
     top_chunks = relevant_chunks[:5]
@@ -162,24 +206,37 @@ def generate_answer_with_sources(question: str, user_ip: str = "unknown", mode: 
     # Style Instructions based on detected mode
     if detected_mode == "recruiter":
         style_instruction = (
-            "Answer in a professional, concise tone. Use bullet points where appropriate. "
-            "Focus heavily on metrics, technical skills, project impact, and professional experience. "
-            "If relevant links (GitHub, LinkedIn, Portfolio) are found in the context, include them."
+            "You are a professional resume assistant representing Sahil. "
+            "Answer in a direct, professional, and concise manner suitable for recruiters or hiring managers. "
+            "Use bullet points for lists. Highlight metrics, technical skills, project outcomes, and professional accomplishments. "
+            "Format key information with **bold** text. "
+            "If relevant links (GitHub, LinkedIn, Portfolio) are found in the context, include them. "
+            "Do NOT add pleasantries or casual language. Focus purely on factual, career-relevant information."
         )
     else:  # casual
         style_instruction = (
-            "Answer in a friendly, conversational, and simple tone. Use approachable language "
-            "as if you are Sahil's digital twin chatting with a friend. Keep it brief but warm."
+            "You are Sahil's friendly resume assistant. "
+            "Answer in a conversational yet informative tone. Keep responses clear and helpful. "
+            "Use **bold** for important points. Stay focused on resume-related information. "
+            "Be warm but professional - this is still a professional context."
         )
 
-    prompt = f"""You are Sahil's professional digital assistant. {style_instruction}
-Answer the question using the provided resume context. Use **bold** for key achievements or skills.
+    prompt = f"""You are an AI assistant specifically designed to answer questions about Sahil's professional resume and background.
+
+CRITICAL INSTRUCTIONS:
+1. ONLY answer questions related to Sahil's professional background, skills, experience, education, or projects
+2. Base your answers STRICTLY on the provided resume context below
+3. If the question cannot be answered from the resume context, say so clearly
+4. Do NOT make up information or assume details not present in the context
+5. Do NOT respond to personal questions unrelated to the resume
+6. {style_instruction}
 
 Resume Context:
 {context_text}
 
 Question: {question}
-Answer:"""
+
+Answer based solely on the above resume context:"""
 
     providers = [
         ("Groq", generate_with_groq),

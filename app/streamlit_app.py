@@ -1,6 +1,6 @@
 """
 Streamlit Web Interface for Resume RAG System
-Modern, AI-focused UI with sophisticated dark theme
+Enhanced Modern AI Copilot UI with Premium Dark Theme
 """
 
 import streamlit as st
@@ -21,215 +21,403 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for modern, sophisticated dark theme
+# ============================================================================
+# UI IMPROVEMENT: Enhanced CSS with better visual hierarchy and glassmorphism
+# ============================================================================
 st.markdown("""
 <style>
-    /* Global Styles */
+    /* ===== GLOBAL IMPROVEMENTS ===== */
     .stApp {
         background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1419 100%);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
     
-    /* Main Header - Premium dark theme */
+    /* ===== HEADER SECTION - Cleaner, more prominent ===== */
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: 800;
         background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #ec4899 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-align: center;
-        margin-bottom: 0.5rem;
-        letter-spacing: -0.02em;
+        margin-bottom: 0.3rem;
+        letter-spacing: -0.03em;
+        line-height: 1.2;
     }
     
     .sub-header {
-        font-size: 1.1rem;
+        font-size: 1rem;
         color: #94a3b8;
         text-align: center;
-        margin-bottom: 2.5rem;
-        font-weight: 400;
-    }
-    
-    /* Chat Messages */
-    .stChatMessage {
-        background: rgba(30, 41, 59, 0.5) !important;
-        border: 1px solid rgba(100, 116, 139, 0.2);
-        border-radius: 12px;
-        padding: 1.5rem !important;
         margin-bottom: 1rem;
-        backdrop-filter: blur(10px);
+        font-weight: 400;
+        letter-spacing: 0.01em;
     }
     
+    .baby-notice {
+        text-align: center;
+        color: #64748b;
+        font-style: italic;
+        font-size: 0.8rem;
+        margin-bottom: 2rem;
+        padding: 0.5rem;
+        background: rgba(59, 130, 246, 0.05);
+        border-radius: 6px;
+        border: 1px solid rgba(59, 130, 246, 0.1);
+    }
+    
+    /* ===== CHAT MESSAGES - ChatGPT-style bubbles ===== */
+    .stChatMessage {
+        background: rgba(30, 41, 59, 0.4) !important;
+        border: 1px solid rgba(100, 116, 139, 0.15);
+        border-radius: 16px !important;
+        padding: 1.25rem 1.5rem !important;
+        margin-bottom: 1rem;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease;
+    }
+    
+    .stChatMessage:hover {
+        border-color: rgba(100, 116, 139, 0.25);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* User messages - distinct blue tint */
     .stChatMessage[data-testid="user-message"] {
-        background: rgba(59, 130, 246, 0.1) !important;
-        border-color: rgba(59, 130, 246, 0.3);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%) !important;
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        margin-left: 10%;
     }
     
-    /* Source Box - Modern card style */
+    /* Assistant messages - slightly different positioning */
+    .stChatMessage[data-testid="assistant-message"] {
+        margin-right: 10%;
+    }
+    
+    /* ===== SOURCE CARDS - Improved hierarchy ===== */
     .source-box {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-left: 4px solid #3b82f6;
-        padding: 1.25rem;
-        margin: 0.75rem 0;
-        border-radius: 8px;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-left: 3px solid #3b82f6;
+        padding: 1rem 1.25rem;
+        margin: 0.6rem 0;
+        border-radius: 10px;
+        backdrop-filter: blur(8px);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     .source-box:hover {
-        border-color: rgba(59, 130, 246, 0.6);
-        transform: translateX(4px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        border-left-width: 5px;
+        border-color: rgba(59, 130, 246, 0.4);
+        transform: translateX(6px);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.7) 100%);
     }
     
     .source-box strong {
         color: #60a5fa;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: 600;
+        display: block;
+        margin-bottom: 0.4rem;
     }
     
-    /* Confidence Badges */
+    .source-relevance {
+        color: #a78bfa;
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: block;
+        margin-bottom: 0.4rem;
+    }
+    
+    .source-preview {
+        color: #cbd5e1;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        font-style: italic;
+        opacity: 0.9;
+    }
+    
+    /* ===== CONFIDENCE BADGES - Enhanced visual prominence ===== */
+    .confidence-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: rgba(15, 23, 42, 0.4);
+        border-radius: 10px;
+        border: 1px solid rgba(100, 116, 139, 0.1);
+    }
+    
     .confidence-badge {
         display: inline-flex;
         align-items: center;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        margin-top: 1rem;
+        padding: 0.5rem 1.25rem;
+        border-radius: 24px;
+        font-weight: 700;
+        font-size: 0.75rem;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
     
     .confidence-high {
-        background: rgba(34, 197, 94, 0.15);
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
         color: #4ade80;
-        border: 1px solid rgba(34, 197, 94, 0.3);
+        border: 1.5px solid rgba(34, 197, 94, 0.4);
     }
     
     .confidence-medium {
-        background: rgba(251, 191, 36, 0.15);
+        background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%);
         color: #fbbf24;
-        border: 1px solid rgba(251, 191, 36, 0.3);
+        border: 1.5px solid rgba(251, 191, 36, 0.4);
     }
     
     .confidence-low {
-        background: rgba(239, 68, 68, 0.15);
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
         color: #f87171;
-        border: 1px solid rgba(239, 68, 68, 0.3);
+        border: 1.5px solid rgba(239, 68, 68, 0.4);
     }
     
-    /* Sidebar Styling */
+    .source-count-text {
+        color: #64748b;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    /* ===== SIDEBAR - Cleaner grouping and spacing ===== */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
-        border-right: 1px solid rgba(100, 116, 139, 0.2);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.98) 100%);
+        border-right: 1px solid rgba(100, 116, 139, 0.15);
+        backdrop-filter: blur(20px);
     }
     
-    [data-testid="stSidebar"] h1, 
-    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3 {
         color: #f1f5f9;
+        font-weight: 700;
+        margin-bottom: 1rem;
     }
     
-    /* Buttons - Modern gradient style */
+    /* Sidebar section dividers */
+    [data-testid="stSidebar"] hr {
+        margin: 1.5rem 0;
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(100, 116, 139, 0.3), transparent);
+    }
+    
+    /* ===== BUTTONS - Enhanced with better visual feedback ===== */
     .stButton > button {
         background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: white;
         border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        padding: 0.7rem 1.5rem;
         font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        font-size: 0.9rem;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+        letter-spacing: 0.02em;
     }
     
     .stButton > button:hover {
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
         transform: translateY(-2px);
     }
     
-    /* Sample Questions Buttons */
+    .stButton > button:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+    
+    /* Sample question buttons in sidebar */
     [data-testid="stSidebar"] .stButton > button {
-        background: rgba(59, 130, 246, 0.1);
-        color: #60a5fa;
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        font-size: 0.85rem;
-        padding: 0.65rem 1rem;
+        background: rgba(59, 130, 246, 0.08);
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.25);
+        font-size: 0.8rem;
+        padding: 0.6rem 1rem;
         text-align: left;
         font-weight: 500;
+        box-shadow: none;
     }
     
     [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(59, 130, 246, 0.2);
-        border-color: rgba(59, 130, 246, 0.5);
+        background: rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.4);
+        color: #bfdbfe;
+        transform: translateX(4px);
     }
     
-    /* Metrics */
+    /* ===== CHAT INPUT - Modern floating style ===== */
+    .stChatInput {
+        background: rgba(30, 41, 59, 0.6) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        border-radius: 16px !important;
+        backdrop-filter: blur(12px);
+    }
+    
+    .stChatInput:focus-within {
+        border-color: rgba(59, 130, 246, 0.5) !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+    
+    /* ===== EXPANDERS - Cleaner, more subtle ===== */
+    .streamlit-expanderHeader {
+        background: rgba(30, 41, 59, 0.3);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+        border-radius: 10px;
+        color: #94a3b8;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: rgba(30, 41, 59, 0.5);
+        border-color: rgba(100, 116, 139, 0.3);
+        color: #cbd5e1;
+    }
+    
+    /* ===== METRICS - Enhanced visual appeal ===== */
     [data-testid="stMetricValue"] {
         color: #60a5fa;
-        font-size: 2rem;
+        font-size: 1.8rem;
         font-weight: 700;
     }
     
-    /* Info/Success/Error boxes */
-    .stAlert {
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px solid rgba(100, 116, 139, 0.3);
-        border-radius: 8px;
-        backdrop-filter: blur(10px);
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: rgba(30, 41, 59, 0.4);
-        border: 1px solid rgba(100, 116, 139, 0.2);
-        border-radius: 8px;
+    [data-testid="stMetricLabel"] {
         color: #94a3b8;
-        font-weight: 600;
+        font-size: 0.85rem;
+        font-weight: 500;
     }
     
-    /* Chat Input */
-    .stChatInput {
-        background: rgba(30, 41, 59, 0.6);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 12px;
-    }
-    
-    /* Footer Stats */
-    .footer-stat {
-        background: rgba(30, 41, 59, 0.4);
-        border: 1px solid rgba(100, 116, 139, 0.2);
-        border-radius: 8px;
+    /* ===== ALERTS - Better integration ===== */
+    .stAlert {
+        background: rgba(30, 41, 59, 0.5);
+        border: 1px solid rgba(100, 116, 139, 0.25);
+        border-radius: 10px;
+        backdrop-filter: blur(10px);
         padding: 1rem;
+    }
+    
+    /* ===== FOOTER STATS - Card-style layout ===== */
+    .footer-stat {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.5) 100%);
+        border: 1px solid rgba(100, 116, 139, 0.2);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
         text-align: center;
         color: #94a3b8;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        backdrop-filter: blur(8px);
+        transition: all 0.2s ease;
+    }
+    
+    .footer-stat:hover {
+        border-color: rgba(100, 116, 139, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
     
     .footer-stat strong {
         color: #60a5fa;
         display: block;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.4rem;
+        font-size: 0.95rem;
+        font-weight: 700;
     }
     
-    /* Spinner */
+    /* ===== SPINNER - Branded color ===== */
     .stSpinner > div {
         border-top-color: #3b82f6 !important;
     }
     
-    /* Radio buttons */
-    .stRadio > label {
+    /* ===== FORM ELEMENTS - Consistent styling ===== */
+    .stRadio > label,
+    .stSelectbox > label,
+    .stCheckbox > label {
         color: #94a3b8;
+        font-weight: 500;
+        font-size: 0.9rem;
     }
     
-    /* Divider */
-    hr {
-        border-color: rgba(100, 116, 139, 0.2);
+    .stRadio [role="radiogroup"] {
+        gap: 0.5rem;
+    }
+    
+    .stRadio [role="radio"] {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+    }
+    
+    .stRadio [role="radio"]:hover {
+        background: rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.4);
+    }
+    
+    /* ===== SECTION HEADERS - Better hierarchy ===== */
+    h1, h2, h3 {
+        color: #f1f5f9;
+        font-weight: 700;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid rgba(59, 130, 246, 0.2);
+    }
+    
+    /* ===== SCROLLBAR - Subtle custom styling ===== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(15, 23, 42, 0.5);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.5);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.7);
+    }
+    
+    /* ===== LINK BUTTONS - Special styling ===== */
+    .stLinkButton > a {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        text-decoration: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        display: inline-block;
+        transition: all 0.25s ease;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .stLinkButton > a:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        transform: translateY(-2px);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -240,15 +428,20 @@ if 'chat_history' not in st.session_state:
 if 'show_sources' not in st.session_state:
     st.session_state.show_sources = True
 
-# Header
+# ============================================================================
+# UI IMPROVEMENT: Cleaner header with better spacing
+# ============================================================================
 st.markdown('<div class="main-header">🤖 AI Resume Assistant</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header" style="margin-bottom: 0.5rem;">Powered by RAG | Ask me anything about Sahil Jadhav\'s experience, skills & projects</div>', unsafe_allow_html=True)
-st.markdown('<div style="text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem; margin-bottom: 2rem;">My brain is slow since I was born just now... Please be patient! 👶</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Powered by RAG | Ask me anything about Sahil Jadhav\'s experience, skills & projects</div>', unsafe_allow_html=True)
+st.markdown('<div class="baby-notice">⚡ My brain is warming up... Responses may take a moment! 👶</div>', unsafe_allow_html=True)
 
-# Sidebar
+# ============================================================================
+# UI IMPROVEMENT: Better organized sidebar with clear sections
+# ============================================================================
 with st.sidebar:
-    st.header("⚙️ Configuration")
+    st.header("⚙️ Settings")
     
+    # Configuration section
     search_mode = st.radio(
         "Search Mode",
         ["Hybrid (Recommended)", "Vector Only"],
@@ -258,33 +451,34 @@ with st.sidebar:
     response_mode = st.selectbox(
         "Response Mode",
         ["Auto", "Casual", "Recruiter"],
-        help="Casual: Friendly twin | Recruiter: Professional bullet points | Auto: Swaps based on question"
+        help="Auto: Smart mode switching | Casual: Friendly tone | Recruiter: Professional format"
     )
     st.session_state.response_mode = response_mode.lower()
 
     show_sources = st.checkbox(
         "Show Sources",
         value=True,
-        help="Display which resume sections were used to generate the answer"
+        help="Display which resume sections were used"
     )
     st.session_state.show_sources = show_sources
     
     show_debug = st.checkbox(
         "Debug Mode",
         value=False,
-        help="Display technical details about retrieval process"
+        help="Show technical retrieval details"
     )
     
     st.divider()
     
-    st.header("💡 Sample Questions")
+    # Sample questions section
+    st.header("💡 Quick Questions")
     sample_questions = [
-        "What are all of Sahil's projects?",
-        "What was Sahil's academic performance?",
-        "What technical skills does Sahil have?",
-        "Tell me about the Image Forgery Detection project",
-        "What certifications does Sahil have?",
-        "What programming languages does Sahil know?"
+        "What are Sahil's key projects?",
+        "Tell me about his academic background",
+        "What technical skills does he have?",
+        "Describe the Image Forgery project",
+        "List his certifications",
+        "What programming languages does he know?"
     ]
     
     for question in sample_questions:
@@ -292,16 +486,18 @@ with st.sidebar:
             st.session_state.current_question = question
     
     st.divider()
-    st.sidebar.header("🛡️ Resume Access Control")
+    
+    # Resume access control section
+    st.header("🛡️ Resume Access")
     
     if 'access_token' not in st.session_state:
-         st.session_state.access_token = None
+        st.session_state.access_token = None
     if 'access_status' not in st.session_state:
         st.session_state.access_status = None
 
     if st.session_state.access_token is None:
-        email_inp = st.sidebar.text_input("Professional Email:", placeholder="recruiter@company.com", key="resume_email_input")
-        if st.sidebar.button("Initiate Access Request", use_container_width=True):
+        email_inp = st.text_input("Professional Email:", placeholder="recruiter@company.com", key="resume_email_input")
+        if st.button("Request Access", use_container_width=True):
             if email_inp and "@" in email_inp:
                 try:
                     import uuid
@@ -311,13 +507,13 @@ with st.sidebar:
                     from app.db import get_connection
                     from app.email_service import send_gate_notification
                     
-                    user_ip = "streamlit_user" # Real IP would be better but requires custom components
+                    user_ip = "streamlit_user"
                     hashed_ip = hashlib.sha256(user_ip.encode()).hexdigest()
                     
                     conn = get_connection()
                     cur = conn.cursor()
                     
-                    # 1. Rate Limiting Check
+                    # Rate limiting check
                     one_hour_ago = datetime.now() - timedelta(hours=1)
                     cur.execute(
                         "SELECT count(*) FROM resume_requests WHERE hashed_ip = %s AND created_at > %s",
@@ -326,7 +522,7 @@ with st.sidebar:
                     request_count = cur.fetchone()[0]
                     
                     if request_count >= 3:
-                        st.sidebar.error("Rate limit exceeded. Please wait an hour.")
+                        st.error("Rate limit exceeded. Please wait an hour.")
                         cur.close()
                         conn.close()
                     else:
@@ -342,7 +538,7 @@ with st.sidebar:
                         cur.close()
                         conn.close()
                         
-                        # Notify Sahil
+                        # Notify admin
                         thread = threading.Thread(target=send_gate_notification, args=(email_inp, token))
                         thread.start()
                         
@@ -350,15 +546,14 @@ with st.sidebar:
                         st.session_state.access_status = 'pending'
                         st.rerun()
                 except Exception as e:
-                    st.sidebar.error(f"System error: {e}")
+                    st.error(f"System error: {e}")
             else:
-                st.sidebar.error("Valid email required!")
+                st.error("Valid email required!")
     
     else:
-        # Polling/Refresh UI
+        # Access status polling
         try:
             from app.db import get_connection
-            from app.api import get_config
             conn = get_connection()
             cur = conn.cursor()
             cur.execute("SELECT status FROM resume_requests WHERE token = %s", (st.session_state.access_token,))
@@ -369,38 +564,36 @@ with st.sidebar:
             status = res[0] if res else 'not_found'
             
             if status == 'pending':
-                st.sidebar.info("⏳ Your request is being processed.")
-                with st.sidebar:
-                    with st.spinner("Resume access will be enabled shortly..."):
-                        st.write("_This may take a moment. This helps ensure availability and prevent misuse._")
-                if st.sidebar.button("Refresh Access Status"):
+                st.info("⏳ Request pending approval")
+                with st.spinner("Processing..."):
+                    st.caption("_This helps prevent misuse and ensures quality engagement._")
+                if st.button("Refresh Status", use_container_width=True):
                     st.rerun()
             
             elif status == 'approved':
-                st.sidebar.success("✅ Access Enabled")
-                # Using the API download link
+                st.success("✅ Access Granted!")
                 base_url = "https://rag-portfolio-mvjo.onrender.com"
                 download_url = f"{base_url}/download_resume?token={st.session_state.access_token}"
-                st.sidebar.link_button("🚀 Download Resume Now", download_url, use_container_width=True)
-                if st.sidebar.button("Request New Session"):
+                st.link_button("📥 Download Resume", download_url, use_container_width=True)
+                if st.button("New Request", use_container_width=True):
                     st.session_state.access_token = None
                     st.rerun()
             
             else:
-                 st.sidebar.warning(f"Request status: {status}")
-                 if st.sidebar.button("Try Again"):
+                st.warning(f"Status: {status}")
+                if st.button("Try Again", use_container_width=True):
                     st.session_state.access_token = None
                     st.rerun()
                     
         except Exception as e:
-            st.sidebar.error(f"Status check failed: {e}")
-            if st.sidebar.button("Reset"):
+            st.error(f"Status check failed: {e}")
+            if st.button("Reset", use_container_width=True):
                 st.session_state.access_token = None
                 st.rerun()
     
     st.divider()
     
-    # Stats
+    # System status section
     st.header("📊 System Status")
     try:
         from app.db import get_connection
@@ -412,36 +605,37 @@ with st.sidebar:
         conn.close()
         
         st.metric("Resume Chunks", chunk_count)
-        st.success("✅ System Online")
+        st.success("✅ All Systems Online")
     except Exception as e:
-        st.error("❌ Database Error")
+        st.error("❌ Database Offline")
         if show_debug:
             st.error(f"Error: {e}")
     
     # Clear chat button
-    if st.button("🗑️ Clear Chat History", use_container_width=True):
+    if st.button("🗑️ Clear Chat", use_container_width=True):
         st.session_state.chat_history = []
         st.rerun()
 
-# Main chat interface
-st.header("💬 Conversation")
+# ============================================================================
+# MAIN CHAT INTERFACE - Enhanced message display
+# ============================================================================
+st.header("💬 Chat")
 
-# Display chat history
+# Display chat history with improved rendering
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         
-        # Show sources if available
+        # ===== UI IMPROVEMENT: Better source card rendering =====
         if message["role"] == "assistant" and "sources" in message and st.session_state.show_sources:
             with st.expander("📚 View Sources", expanded=False):
-                # Using a single markdown block for all sources in the expander for cleaner rendering
                 sources_html = ""
                 for idx, source in enumerate(message["sources"], 1):
                     sources_html += f"""
                     <div class="source-box">
-                        <strong>Source {idx}: {source['section']}</strong><br>
-                        <span style="color: #60a5fa; font-size: 0.85rem;">Relevance Score: {source['relevance']}</span><br>
-                        <em style="color: #cbd5e1; font-size: 0.9rem;">"{source['preview']}"</em>
+                        <strong>Source {idx}: {source['section']}</strong>
+                        <span class="source-relevance">Relevance: {source['relevance']}</span>
+                        <span class="source-preview">{source['preview']}</span>
                     </div>
                     """
                 st.markdown(sources_html, unsafe_allow_html=True)
@@ -454,7 +648,9 @@ if 'current_question' in st.session_state:
     question = st.session_state.current_question
     del st.session_state.current_question
 
-# Process question
+# ============================================================================
+# PROCESS QUESTION - No logic changes, only UI improvements
+# ============================================================================
 if question:
     # Add user message to chat
     st.session_state.chat_history.append({"role": "user", "content": question})
@@ -463,47 +659,45 @@ if question:
         st.markdown(question)
     
     with st.chat_message("assistant"):
-        with st.spinner("🤔 Thinking..."):
-            # 1. Create a placeholder for the streaming text
+        with st.spinner("🤔 Processing your question..."):
+            # Create placeholder for streaming
             answer_placeholder = st.empty()
             full_answer = ""
             metadata = None
             
-            # 2. Consume the stream
             try:
-                # This is the generator from rag_answer.py
-                # Note: Streamlit doesn't easily expose client IP without custom components,
-                # so we log as 'streamlit-frontend' for now.
                 stream_gen = generate_answer_with_sources(
                     question, 
                     user_ip="streamlit-frontend",
                     mode=st.session_state.get('response_mode', 'auto')
                 )
                 
-                # We need to process the stream manually to catch the metadata at the end
+                # Process stream
                 for result in stream_gen:
                     chunk = result.get("answer_chunk", "")
                     full_answer += chunk
-                    # Update placeholder with current full text
                     answer_placeholder.markdown(full_answer + "▌")
                     
-                    # Check for metadata (sent as the last yield)
                     if result.get("metadata"):
                         metadata = result["metadata"]
                 
                 # Final render without cursor
                 answer_placeholder.markdown(full_answer)
                 
-                # 3. Post-process metadata (Confidence & Sources)
+                # ===== UI IMPROVEMENT: Enhanced confidence and source display =====
                 if metadata:
                     confidence = metadata['confidence']
+                    
+                    # Confidence container with better visual hierarchy
                     st.markdown(f"""
-                    <div class="confidence-badge confidence-{confidence}">
-                        {confidence.upper()} CONFIDENCE
+                    <div class="confidence-container">
+                        <div class="confidence-badge confidence-{confidence}">
+                            {confidence.upper()} Confidence
+                        </div>
+                        <span class="source-count-text">
+                            {metadata['total_chunks']} sources analyzed
+                        </span>
                     </div>
-                    <span style="color: #64748b; margin-left: 1rem; font-size: 0.85rem;">
-                        {metadata['total_chunks']} sources analyzed
-                    </span>
                     """, unsafe_allow_html=True)
                     
                     if st.session_state.show_sources and metadata['sources']:
@@ -512,9 +706,9 @@ if question:
                             for idx, source in enumerate(metadata['sources'], 1):
                                 sources_html += f"""
                                 <div class="source-box">
-                                    <strong>Source {idx}: {source['section']}</strong><br>
-                                    <span style="color: #60a5fa; font-size: 0.85rem;">Relevance Score: {source['relevance']}</span><br>
-                                    <em style="color: #cbd5e1; font-size: 0.9rem;">"{source['preview']}"</em>
+                                    <strong>Source {idx}: {source['section']}</strong>
+                                    <span class="source-relevance">Relevance: {source['relevance']}</span>
+                                    <span class="source-preview">{source['preview']}</span>
                                 </div>
                                 """
                             st.markdown(sources_html, unsafe_allow_html=True)
@@ -535,7 +729,9 @@ if question:
                 st.error(f"❌ Error: {str(e)}")
                 st.session_state.chat_history.append({"role": "assistant", "content": f"Error: {str(e)}"})
 
-# Footer
+# ============================================================================
+# FOOTER - Enhanced card-style stats
+# ============================================================================
 st.divider()
 col1, col2, col3 = st.columns(3)
 
@@ -543,7 +739,7 @@ with col1:
     st.markdown("""
     <div class="footer-stat">
         <strong>💡 Pro Tip</strong>
-        Use specific questions for precise answers
+        Ask specific questions for precise answers
     </div>
     """, unsafe_allow_html=True)
 
@@ -563,7 +759,9 @@ with col3:
     </div>
     """, unsafe_allow_html=True)
 
-# About section
+# ============================================================================
+# ABOUT SECTION - Enhanced information architecture
+# ============================================================================
 with st.expander("ℹ️ About This System"):
     st.markdown("""
     ### 🚀 How It Works
