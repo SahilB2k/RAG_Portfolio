@@ -236,6 +236,46 @@ def ask_sync():
         "metadata": metadata
     })
 
+
+@app.route('/log_download', methods=['POST'])
+def log_download():
+    """Logs a resume download event with secret tracking data"""
+    data = request.json
+    email = data.get('email', 'Anonymous')
+    purpose = data.get('purpose', 'Quick Download')
+    source_ref = data.get('source_ref', 'Direct/Organic')
+    
+    # Capture Digital Fingerprint
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+    platform = get_platform_from_ua(user_agent)
+    user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    
+    try:
+        from app.db import get_connection
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        # Make sure you added these columns to your resume_requests or a new table
+        # If using your existing resume_requests table:
+        cur.execute(
+            """INSERT INTO resume_requests 
+               (email, status, hashed_ip, user_agent, platform, token) 
+               VALUES (%s, 'downloaded', %s, %s, %s, %s)""",
+            (email, hashlib.sha256(user_ip.encode()).hexdigest(), user_agent, platform, f"REF:{source_ref}")
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # Optional: Trigger the notification alert
+        # from app.email_service import send_download_alert
+        # send_download_alert(email, purpose, f"Source: {source_ref}\nPlatform: {platform}")
+        
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        print(f"❌ [API] Log Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     # Listen on all interfaces so mobile device can connect
     app.run(host='0.0.0.0', port=5000, debug=True)
