@@ -314,4 +314,4 @@ with st.expander("ℹ️ About This System"):
 # LOCAL RUN INFO
 # =============================================================================
 if __name__ == "__main__":
-    st.info()
+    st.info("App is running")
