@@ -9,7 +9,7 @@ import threading
 from app.config import get_config
 from datetime import datetime, timedelta
 import hashlib
-from app.email_service import send_gate_notification
+from app.email_service import send_download_alert
 
 config = get_config()
 app = Flask(__name__)
@@ -103,7 +103,7 @@ def request_resume():
         
         # Notify owner in background
         thread = threading.Thread(
-            target=send_gate_notification, 
+            target=send_download_alert, 
             args=(email, token)
         )
         thread.start()
